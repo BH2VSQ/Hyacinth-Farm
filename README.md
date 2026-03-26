@@ -13,8 +13,7 @@ node server.js
 
 浏览器访问 `http://localhost:3000`
 
-> 默认端口为 3000，可通过环境变量 `PORT` 修改：`PORT=8080 node server.js`
-> 也可在server.js中修改，搜索 `const PORT = parseInt(process.env.PORT) || 3000;` 将其中的3000端口修改为想要实际部署使用的端口
+> 默认端口为 3000，可在server.js中修改，搜索 `const PORT = parseInt(process.env.PORT) || 3000;` 将其中的3000端口修改为想要实际部署使用的端口
 
 ---
 
