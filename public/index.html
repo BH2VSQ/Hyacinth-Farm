@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hyacinth Farm Monitor</title>
+<link rel="icon" type="image/x-icon" href="/logo.ico">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+/* ── Reset & Variables ─────────────────────────────────────────────── */
+:root {
+  --bg:       #0c0e14;
+  --surface:  #151820;
+  --surface2: #1d2130;
+  --surface3: #242840;
+  --accent:   #4ade80;
+  --accent2:  #22c55e;
+  --text:     #e2e8f0;
+  --text2:    #8b95b0;
+  --border:   #252a40;
+  --warn:     #f59e0b;
+  --err:      #ef4444;
+  --info:     #60a5fa;
+  --debug:    #a78bfa;
+  --rad:      10px;
+}
+
+/* Light mode */
+[data-theme="light"] {
+  --bg:       #f5f7fa;
+  --surface:  #ffffff;
+  --surface2: #f0f2f5;
+  --surface3: #e5e7eb;
+  --accent:   #22c55e;
+  --accent2:  #16a34a;
+  --text:     #1e293b;
+  --text2:    #64748b;
+  --border:   #e2e8f0;
+  --warn:     #f59e0b;
+  --err:      #ef4444;
+  --info:     #3b82f6;
+  --debug:    #8b5cf6;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+/* ── Navigation ────────────────────────────────────────────────────── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 20px; height: 54px; gap: 4px;
+}
+.logo {
+  font-size: 16px; font-weight: 700;
+  color: var(--accent); margin-right: 20px;
+  display: flex; align-items: center; gap: 8px;
+  white-space: nowrap;
+}
+.logo img { width: 32px; height: 32px; object-fit: contain; }
+.tab {
+  padding: 6px 14px; border-radius: 7px;
+  cursor: pointer; color: var(--text2);
+  font-size: 13px; font-weight: 500;
+  transition: all .15s; border: none; background: none;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); background: var(--surface2); }
+.tab.active { color: var(--accent); background: rgba(74,222,128,.1); }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+/* Theme Toggle */
+.theme-toggle {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text2);
+  transition: all .15s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+
+/* Heartbeat Status */
+.heartbeat-status {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 12px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 6px;
+  min-width: 340px; max-width: 340px;
+}
+.hb-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent); flex-shrink: 0;
+  transition: background .3s;
+  animation: pulse 2s ease-in-out infinite;
+}
+.hb-dot.warning { background: var(--warn); animation: none; }
+.hb-dot.error { background: var(--err); animation: none; }
+.hb-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.hb-timer { font-size: 12px; color: var(--text); font-weight: 600; font-family: 'Consolas', monospace; }
+.hb-label { 
+  font-size: 10px; color: var(--text2); 
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.9); }
+}
+
+/* ── Pages ─────────────────────────────────────────────────────────── */
+.page { display: none; padding: 22px 24px; max-width: 1400px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* ── Cards ──────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rad);
+  padding: 18px 20px;
+}
+.card-title {
+  font-size: 11px; font-weight: 600;
+  color: var(--text2); text-transform: uppercase;
+  letter-spacing: .08em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title .badge-new {
+  font-size: 10px; font-weight: 700; padding: 1px 6px;
+  border-radius: 4px; background: rgba(74,222,128,.15); color: var(--accent);
+  opacity: 0; transition: opacity .3s;
+}
+.card-title .badge-new.show { opacity: 1; }
+
+/* ── Dashboard ──────────────────────────────────────────────────────── */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 18px;
+}
+.dash-image-card { grid-column: 1; grid-row: 1; }
+.dash-sensor-card { grid-column: 2; grid-row: 1; }
+.dash-event-card { grid-column: 1 / -1; grid-row: 2; }
+
+.latest-img-wrap {
+  width: 100%; aspect-ratio: 4/3;
+  border-radius: 7px; overflow: hidden;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2); font-size: 14px;
+}
+.latest-img-wrap img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+.img-meta { margin-top: 8px; font-size: 12px; color: var(--text2); min-height: 16px; }
+
+.sensor-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.s-tile {
+  background: var(--surface2); border-radius: 8px; padding: 12px 14px;
+  border: 1px solid transparent; transition: border-color .2s;
+}
+.s-tile.updated { border-color: rgba(74,222,128,.35); }
+.s-tile .s-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.s-tile .s-val   { font-size: 26px; font-weight: 700; color: var(--accent); line-height: 1; }
+.s-tile .s-unit  { font-size: 12px; color: var(--text2); margin-left: 3px; }
+.s-tile .s-time  { font-size: 10px; color: var(--text2); margin-top: 5px; opacity: .75; }
+.data-update-ts  { font-size: 12px; color: var(--text2); margin-top: 10px; min-height: 16px; }
+
+.event-list { max-height: 240px; overflow-y: auto; }
+.event-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px; animation: fadeIn .25s ease;
+}
+.event-row:last-child { border-bottom: none; }
+.event-tag {
+  padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700;
+  background: rgba(74,222,128,.12); color: var(--accent); white-space: nowrap;
+  flex-shrink: 0;
+}
+.event-detail { flex: 1; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-ts { font-size: 11px; color: var(--text2); white-space: nowrap; flex-shrink: 0; }
+.empty-msg { color: var(--text2); font-size: 13px; padding: 16px 0; text-align: center; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* ── Gallery ─────────────────────────────────────────────────────────── */
+.gallery-bar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.gallery-bar .total-label { font-size: 13px; color: var(--text2); }
+.gal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+.gal-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+  cursor: pointer; transition: border-color .15s, transform .15s;
+}
+.gal-item:hover { border-color: var(--accent); transform: translateY(-2px); }
+.gal-item img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.gal-item .gal-info { padding: 7px 9px; font-size: 11px; color: var(--text2); }
+.pager { display: flex; align-items: center; gap: 12px; margin-top: 20px; justify-content: center; }
+.page-info { font-size: 13px; color: var(--text2); }
+
+/* ── Charts ──────────────────────────────────────────────────────────── */
+.chart-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.chart-card { 
+  background: var(--surface); 
+  border: 1px solid var(--border); 
+  border-radius: var(--rad); 
+  padding: 18px 20px;
+}
+.chart-card h4 { 
+  font-size: 13px; color: var(--text); 
+  font-weight: 600;
+  margin-bottom: 14px; 
+}
+.chart-wrap { position: relative; height: 200px; }
+.preset-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Debug Logs ─────────────────────────────────────────────────────── */
+.log-panel { 
+  background: var(--surface); 
+  border: 1px solid var(--border); 
+  border-radius: var(--rad); 
+  overflow: hidden; 
+  height: calc(100vh - 118px); 
+  display: flex; 
+  flex-direction: column; 
+}
+.log-toolbar { 
+  display: flex; align-items: center; gap: 10px; 
+  padding: 12px 16px; 
+  background: var(--surface); 
+  border-bottom: 1px solid var(--border); 
+  flex-wrap: wrap; 
+  flex-shrink: 0; 
+}
+.log-body { 
+  flex: 1; 
+  overflow-y: auto; 
+  font-family: 'Consolas', 'Monaco', 'Lucida Console', monospace; 
+  font-size: 13px; 
+  background: var(--surface);
+  padding: 8px 0;
+}
+.log-row {
+  display: flex; gap: 12px; padding: 8px 16px;
+  transition: background .15s;
+  align-items: flex-start;
+}
+.log-row:hover { background: var(--surface2); }
+.log-row.level-ERROR { background: rgba(239,68,68,.05); }
+.log-row.level-WARN  { background: rgba(245,158,11,.05); }
+.l-time  { 
+  color: var(--text2); 
+  white-space: nowrap; 
+  flex-shrink: 0; 
+  font-size: 12px;
+  min-width: 160px;
+}
+.l-level { 
+  width: 56px; 
+  text-align: center; 
+  border-radius: 5px; 
+  padding: 3px 8px; 
+  font-size: 11px; 
+  font-weight: 700; 
+  flex-shrink: 0; 
+  line-height: 1.2;
+}
+.l-level.INFO  { background: rgba(96,165,250,.15);  color: var(--info);  }
+.l-level.WARN  { background: rgba(245,158,11,.15);  color: var(--warn);  }
+.l-level.ERROR { background: rgba(239,68,68,.15);   color: var(--err);   }
+.l-level.DEBUG { background: rgba(167,139,250,.15); color: var(--debug); }
+.l-msg { 
+  flex: 1; 
+  word-break: break-word; 
+  line-height: 1.6; 
+  color: var(--text); 
+}
+.autoscroll-label { 
+  display: flex; align-items: center; gap: 6px; 
+  font-size: 13px; color: var(--text2); 
+  cursor: pointer; user-select: none; 
+}
+.autoscroll-label input[type="checkbox"] {
+  cursor: pointer;
+}
+.log-count { 
+  font-size: 13px; color: var(--text2); 
+  margin-left: auto; white-space: nowrap; 
+}
+
+/* ── Common Controls ────────────────────────────────────────────────── */
+.btn {
+  padding: 6px 14px; border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text);
+  cursor: pointer; font-size: 13px;
+  transition: all .15s; white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: #0a0d12; border-color: var(--accent); font-weight: 700; }
+.btn.primary:hover { background: var(--accent2); border-color: var(--accent2); color: #0a0d12; }
+input[type="datetime-local"], select {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px;
+}
+input[type="datetime-local"]:focus, select:focus { outline: none; border-color: var(--accent); }
+label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+
+/* ── Lightbox ────────────────────────────────────────────────────────── */
+#lightbox {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.92); z-index: 9999;
+  align-items: center; justify-content: center;
+}
+#lightbox.open { display: flex; }
+#lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 8px; }
+#lightbox-close {
+  position: absolute; top: 16px; right: 20px;
+  background: none; border: none; color: #fff;
+  font-size: 36px; cursor: pointer; line-height: 1; opacity: .7;
+}
+#lightbox-close:hover { opacity: 1; }
+#lightbox-ts {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; color: rgba(255,255,255,.6); background: rgba(0,0,0,.4);
+  padding: 4px 12px; border-radius: 20px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .dash-image-card, .dash-sensor-card, .dash-event-card { grid-column: 1; grid-row: auto; }
+  .charts-grid { grid-template-columns: 1fr; }
+  .page { padding: 14px 14px; }
+}
+@media (max-width: 600px) {
+  .sensor-grid { grid-template-columns: 1fr 1fr; }
+  .gal-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <img src="/logo.png" alt="Logo" onerror="this.style.display='none'">
+    Hyacinth Farm
+  </div>
+  <button class="tab active" data-tab="dashboard" onclick="showTab(this,'dashboard')">仪表板</button>
+  <button class="tab" data-tab="gallery"   onclick="showTab(this,'gallery')">相册</button>
+  <button class="tab" data-tab="charts"    onclick="showTab(this,'charts')">数据图表</button>
+  <button class="tab" data-tab="logs"      onclick="showTab(this,'logs')">调试日志</button>
+  <div class="nav-right">
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <span id="themeIcon">🌙</span>
+      <span id="themeText">深色</span>
+    </button>
+    <div class="heartbeat-status">
+      <div class="hb-dot" id="hbDot"></div>
+      <div class="hb-info" id="hbInfo">
+        <div class="hb-timer" id="hbTimer">--</div>
+        <div class="hb-label" id="hbLabel">心跳倒计时</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Dashboard ──────────────────────────────────────────────────────── -->
+<div class="page active" id="page-dashboard">
+  <div class="dash-grid">
+    <!-- Latest Image -->
+    <div class="card dash-image-card">
+      <div class="card-title">
+        📷 最新图像
+        <span class="badge-new" id="badge-img">已更新</span>
+      </div>
+      <div class="latest-img-wrap" id="imgWrap">暂无图像</div>
+      <div class="img-meta" id="imgMeta"></div>
+    </div>
+
+    <!-- Sensor Data -->
+    <div class="card dash-sensor-card">
+      <div class="card-title">
+        📊 最新传感器数据
+        <span class="badge-new" id="badge-data">已更新</span>
+      </div>
+      <div class="sensor-grid">
+        <div class="s-tile" id="tile-temp">
+          <div class="s-label">环境温度</div>
+          <div><span class="s-val" id="v-temp">--</span><span class="s-unit">°C</span></div>
+          <div class="s-time" id="t-temp"></div>
+        </div>
+        <div class="s-tile" id="tile-hum">
+          <div class="s-label">环境湿度</div>
+          <div><span class="s-val" id="v-hum">--</span><span class="s-unit">%</span></div>
+          <div class="s-time" id="t-hum"></div>
+        </div>
+        <div class="s-tile" id="tile-light">
+          <div class="s-label">光照强度</div>
+          <div><span class="s-val" id="v-light">--</span><span class="s-unit">lx</span></div>
+          <div class="s-time" id="t-light"></div>
+        </div>
+        <div class="s-tile" id="tile-soil">
+          <div class="s-label">土壤湿度</div>
+          <div><span class="s-val" id="v-soil">--</span><span class="s-unit">%</span></div>
+          <div class="s-time" id="t-soil"></div>
+        </div>
+        <div class="s-tile" id="tile-pres">
+          <div class="s-label">气压</div>
+          <div><span class="s-val" id="v-pres">--</span><span class="s-unit">hPa</span></div>
+          <div class="s-time" id="t-pres"></div>
+        </div>
+      </div>
+      <div class="data-update-ts" id="dataUpdateTs"></div>
+    </div>
+
+    <!-- Events -->
+    <div class="card dash-event-card">
+      <div class="card-title">🔔 最近设备事件</div>
+      <div class="event-list" id="eventList"><div class="empty-msg">暂无事件记录</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Gallery ────────────────────────────────────────────────────────── -->
+<div class="page" id="page-gallery">
+  <div class="gallery-bar">
+    <span class="total-label">共 <strong id="galTotal">0</strong> 张图片</span>
+    <button class="btn" onclick="loadGallery()">🔄 刷新</button>
+  </div>
+  <div class="gal-grid" id="galGrid"><div class="empty-msg" style="grid-column:1/-1">加载中…</div></div>
+  <div class="pager">
+    <button class="btn" id="btnPrev" onclick="changeGalPage(-1)">← 上一页</button>
+    <span class="page-info" id="galPageInfo">第 1 页</span>
+    <button class="btn" id="btnNext" onclick="changeGalPage(1)">下一页 →</button>
+  </div>
+</div>
+
+<!-- ── Charts ─────────────────────────────────────────────────────────── -->
+<div class="page" id="page-charts">
+  <div class="chart-bar">
+    <label class="ctrl-label">开始</label>
+    <input type="datetime-local" id="chartStart">
+    <label class="ctrl-label">结束</label>
+    <input type="datetime-local" id="chartEnd">
+    <button class="btn primary" onclick="loadCharts()">查询</button>
+    <div class="preset-btns">
+      <button class="btn" onclick="setPreset(1)">1 小时</button>
+      <button class="btn" onclick="setPreset(24)">24 小时</button>
+      <button class="btn" onclick="setPreset(168)">7 天</button>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h4>🌡💧 环境温度 & 湿度</h4>
+      <div class="chart-wrap"><canvas id="cTempHum"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>☀️ 光照强度 (lx)</h4>
+      <div class="chart-wrap"><canvas id="cLight"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>🌬 气压 (kPa)</h4>
+      <div class="chart-wrap"><canvas id="cPres"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>🌱 土壤湿度 (%)</h4>
+      <div class="chart-wrap"><canvas id="cSoil"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Debug Logs ──────────────────────────────────────────────────────── -->
+<div class="page" id="page-logs">
+  <div class="log-panel">
+    <div class="log-toolbar">
+      <button class="btn" onclick="loadLogs()">🔄 刷新</button>
+      <button class="btn" onclick="clearLogView()">清屏</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="chkAutoScroll" checked> 自动滚动
+      </label>
+      <select id="selLevel" onchange="applyFilter()" style="margin-left:8px;">
+        <option value="">全部级别</option>
+        <option value="DEBUG">DEBUG</option>
+        <option value="INFO">INFO</option>
+        <option value="WARN">WARN</option>
+        <option value="ERROR">ERROR</option>
+      </select>
+      <span class="log-count" id="logCount">0 条</span>
+    </div>
+    <div class="log-body" id="logBody"></div>
+  </div>
+</div>
+
+<!-- ── Lightbox ───────────────────────────────────────────────────────── -->
+<div id="lightbox" onclick="closeLightbox(event)">
+  <button id="lightbox-close" onclick="closeLightbox()">×</button>
+  <img id="lbImg" src="" alt="">
+  <div id="lightbox-ts"></div>
+</div>
+
+<script>
+'use strict';
+
+// ── Theme Management ──────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeUI(saved);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  updateThemeUI(next);
+}
+
+function updateThemeUI(theme) {
+  $('themeIcon').textContent = theme === 'dark' ? '🌙' : '☀️';
+  $('themeText').textContent = theme === 'dark' ? '深色' : '浅色';
+}
+
+// ── Heartbeat Management ──────────────────────────────────────────────
+let lastHeartbeat = null;
+let nextHeartbeat = null;
+let heartbeatInterval = 60;
+let offlineStartTime = null;
+let heartbeatTimer = null;
+
+async function loadHeartbeatStatus() {
+  try {
+    const response = await fetch('/api/heartbeat');
+    const data = await response.json();
+    
+    if (data.lastHeartbeat) {
+      lastHeartbeat = new Date(data.lastHeartbeat).getTime();
+      if (data.nextHeartbeat) {
+        nextHeartbeat = new Date(data.nextHeartbeat).getTime();
+      }
+      if (data.interval) {
+        heartbeatInterval = data.interval;
+      }
+      
+      // 如果已经超过预期时间15秒，标记为离线
+      if (data.nextElapsedSeconds !== null && data.nextElapsedSeconds > 15) {
+        offlineStartTime = nextHeartbeat + 15000;
+      }
+      
+      updateHeartbeatUI();
+    }
+  } catch (e) {
+    console.warn('Failed to load heartbeat status:', e);
+  }
+}
+
+function formatDuration(seconds) {
+  if (seconds < 60) return seconds + '秒';
+  if (seconds < 3600) return Math.floor(seconds / 60) + '分钟';
+  if (seconds < 86400) return Math.floor(seconds / 3600) + '小时';
+  return Math.floor(seconds / 86400) + '天';
+}
+
+function updateHeartbeatUI() {
+  if (!lastHeartbeat || !nextHeartbeat) {
+    $('hbTimer').textContent = '--';
+    $('hbLabel').textContent = '等待心跳...';
+    $('hbDot').className = 'hb-dot error';
+    offlineStartTime = null;
+    return;
+  }
+
+  const now = Date.now();
+  const sinceNext = Math.floor((now - nextHeartbeat) / 1000);
+  const lastTime = new Date(lastHeartbeat).toLocaleString('zh-CN', { 
+    month: '2-digit', day: '2-digit', 
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false 
+  });
+
+  if (sinceNext > 15) {
+    // 超过预期时间15秒，显示红色离线
+    $('hbDot').className = 'hb-dot error';
+    
+    // 记录离线开始时间
+    if (!offlineStartTime) {
+      offlineStartTime = nextHeartbeat + 15000;
+    }
+    
+    const offlineDuration = Math.floor((now - offlineStartTime) / 1000);
+    $('hbTimer').textContent = '离线 ' + formatDuration(offlineDuration);
+    $('hbLabel').textContent = '上次心跳: ' + lastTime;
+  } else if (sinceNext > 0) {
+    // 超过预期时间但在15秒内，显示黄色警告
+    $('hbDot').className = 'hb-dot warning';
+    $('hbTimer').textContent = '+' + sinceNext + 's';
+    $('hbLabel').textContent = '上次心跳: ' + lastTime;
+    offlineStartTime = null;
+  } else {
+    // 未到预期时间，显示绿色正常
+    $('hbDot').className = 'hb-dot';
+    const remaining = Math.abs(sinceNext);
+    $('hbTimer').textContent = remaining + 's';
+    $('hbLabel').textContent = '上次心跳: ' + lastTime;
+    offlineStartTime = null;
+  }
+}
+
+function startHeartbeatMonitor() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(updateHeartbeatUI, 1000);
+  updateHeartbeatUI();
+}
+
+function recordHeartbeat(data) {
+  lastHeartbeat = Date.now();
+  if (data && data.nextHeartbeat) {
+    nextHeartbeat = new Date(data.nextHeartbeat).getTime();
+  }
+  if (data && data.interval) {
+    heartbeatInterval = data.interval;
+  }
+  offlineStartTime = null;
+  updateHeartbeatUI();
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function fmtTs(ts) {
+  if (!ts) return '';
+  try { return new Date(ts).toLocaleString('zh-CN', { hour12: false }); }
+  catch { return ts; }
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function flashTile(id) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.add('updated');
+  setTimeout(() => el.classList.remove('updated'), 2500);
+}
+
+function showBadge(id) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function filenameToTs(name) {
+  const base = name.replace(/\.[^.]+$/, '');
+  // ISO format with dashes: 2024-01-15T12-30-45-000Z  →  2024-01-15T12:30:45.000Z
+  const iso = base.replace(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3}Z)$/, '$1:$2:$3.$4');
+  const d = new Date(iso);
+  if (!isNaN(d)) return d.toISOString();
+  // Unix ms fallback
+  const ms = parseInt(base);
+  if (!isNaN(ms) && ms > 1e12) return new Date(ms).toISOString();
+  return null;
+}
+
+// ── Tab Navigation ────────────────────────────────────────────────────
+let chartsReady = false;
+
+function showTab(btn, name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav .tab').forEach(t => t.classList.remove('active'));
+  $('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'gallery') loadGallery();
+  if (name === 'charts')  { 
+    if (!chartsReady) { 
+      initCharts(); 
+      chartsReady = true;
+    }
+  }
+  if (name === 'logs')    loadLogs();
+}
+
+// ── SSE ───────────────────────────────────────────────────────────────
+let sseTimer;
+
+function connectSSE() {
+  const es = new EventSource('/api/stream');
+  es.addEventListener('connected', () => {
+    console.log('SSE connected');
+  });
+  es.addEventListener('data',  e => { 
+    const data = JSON.parse(e.data);
+    updateSensors(data); 
+    showBadge('badge-data');
+    updateChartsRealtime(data);
+  });
+  es.addEventListener('image', e => { const d = JSON.parse(e.data); setLatestImage(d.filename, d.timestamp); showBadge('badge-img'); });
+  es.addEventListener('event', e => prependEvent(JSON.parse(e.data)));
+  es.addEventListener('log',   e => pushLogLine(JSON.parse(e.data)));
+  es.addEventListener('heartbeat', e => { 
+    const data = JSON.parse(e.data);
+    recordHeartbeat(data); 
+  });
+  es.onerror = () => {
+    console.log('SSE disconnected');
+    es.close();
+    clearTimeout(sseTimer);
+    sseTimer = setTimeout(connectSSE, 5000);
+  };
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────
+function setLatestImage(filename, ts) {
+  $('imgWrap').innerHTML = `<img src="/pic/${escHtml(filename)}" alt="latest" onclick="openLightbox('/pic/${escHtml(filename)}','${escHtml(ts || '')}')">`;
+  $('imgMeta').textContent = ts ? '拍摄时间: ' + fmtTs(ts) : '';
+}
+
+function setSensor(id, tileId, val, unit, ts) {
+  if (val === null || val === undefined) return;
+  $(id).textContent = typeof val === 'number' ? val.toFixed(1) : val;
+  const tEl = $('t-' + id.substring(2).toLowerCase());
+  if (tEl) tEl.textContent = fmtTs(ts);
+  flashTile(tileId);
+}
+
+function updateSensors(d) {
+  setSensor('v-temp',  'tile-temp',  d.temperature,   '°C',  d.timestamp);
+  setSensor('v-hum',   'tile-hum',   d.humidity,      '%',   d.timestamp);
+  setSensor('v-light', 'tile-light', d.light,         'lx',  d.timestamp);
+  setSensor('v-soil',  'tile-soil',  d.soil_moisture, '%',   d.timestamp);
+  setSensor('v-pres',  'tile-pres',  d.pressure,      'hPa', d.timestamp);
+  $('dataUpdateTs').textContent = '更新时间: ' + fmtTs(d.timestamp);
+}
+
+function prependEvent(d) {
+  const list = $('eventList');
+  const empty = list.querySelector('.empty-msg');
+  if (empty) empty.remove();
+  const row = document.createElement('div');
+  row.className = 'event-row';
+  row.innerHTML = `
+    <span class="event-tag">${escHtml(d.event)}</span>
+    <span class="event-detail">${escHtml(d.detail || '')}</span>
+    <span class="event-ts">${fmtTs(d.timestamp)}</span>`;
+  list.insertBefore(row, list.firstChild);
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+async function loadDashboard() {
+  // Latest image
+  try {
+    const r = await fetch('/api/images?limit=1');
+    const { files } = await r.json();
+    if (files && files.length) setLatestImage(files[0], filenameToTs(files[0]));
+  } catch (e) { console.warn('Dashboard image load:', e); }
+
+  // Latest sensor
+  try {
+    const r = await fetch('/api/data?limit=1');
+    const rows = await r.json();
+    if (rows.length) updateSensors(rows[0]);
+  } catch (e) { console.warn('Dashboard sensor load:', e); }
+
+  // Recent events
+  try {
+    const r = await fetch('/api/events?limit=30');
+    const rows = await r.json();
+    if (rows.length) {
+      $('eventList').innerHTML = '';
+      rows.forEach(prependEvent);
+      // prependEvent reverses order; re-sort descending
+      const list = $('eventList');
+      const children = Array.from(list.children).reverse();
+      list.innerHTML = '';
+      children.forEach(c => list.appendChild(c));
+    }
+  } catch (e) { console.warn('Dashboard events load:', e); }
+}
+
+// ── Gallery ───────────────────────────────────────────────────────────
+const PAGE_SIZE = 24;
+let galPage = 0;
+
+async function loadGallery() {
+  const grid = $('galGrid');
+  grid.innerHTML = '<div class="empty-msg" style="grid-column:1/-1">加载中…</div>';
+  try {
+    const r    = await fetch(`/api/images?limit=${PAGE_SIZE}&offset=${galPage * PAGE_SIZE}`);
+    const data = await r.json();
+    $('galTotal').textContent = data.total;
+
+    if (!data.files.length) {
+      grid.innerHTML = '<div class="empty-msg" style="grid-column:1/-1">暂无图片</div>';
+      updatePager(0);
+      return;
+    }
+    grid.innerHTML = '';
+    data.files.forEach(f => {
+      const ts  = filenameToTs(f);
+      const div = document.createElement('div');
+      div.className = 'gal-item';
+      div.innerHTML = `
+        <img src="/pic/${escHtml(f)}" loading="lazy" alt="${escHtml(f)}"
+             onclick="openLightbox('/pic/${escHtml(f)}','${escHtml(ts || '')}')">
+        <div class="gal-info">${ts ? fmtTs(ts) : f}</div>`;
+      grid.appendChild(div);
+    });
+    updatePager(data.total);
+  } catch (e) {
+    grid.innerHTML = '<div class="empty-msg" style="grid-column:1/-1">加载失败，请重试</div>';
+  }
+}
+
+function updatePager(total) {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  $('galPageInfo').textContent = `第 ${galPage + 1} / ${totalPages} 页`;
+  $('btnPrev').disabled = galPage === 0;
+  $('btnNext').disabled = galPage >= totalPages - 1;
+}
+
+function changeGalPage(delta) {
+  galPage = Math.max(0, galPage + delta);
+  loadGallery();
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────
+function openLightbox(src, ts) {
+  $('lbImg').src = src;
+  $('lightbox-ts').textContent = ts ? fmtTs(ts) : '';
+  $('lightbox').classList.add('open');
+}
+function closeLightbox(e) {
+  if (!e || e.target === $('lightbox') || e.target === $('lightbox-close')) {
+    $('lightbox').classList.remove('open');
+  }
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('lightbox').classList.remove('open'); });
+
+// ── Charts ────────────────────────────────────────────────────────────
+const CHART_CFG = [
+  { id: 'cTempHum', keys: ['temperature', 'humidity'], colors: ['#f87171', '#60a5fa'], units: ['°C', '%'], mins: [-20, 0], maxs: [90, 110], dual: true },
+  { id: 'cLight', key: 'light', color: '#fbbf24', unit: 'lx', min: 0, max: 2000 },
+  { id: 'cPres', key: 'pressure', color: '#a78bfa', unit: 'kPa', min: 50, max: 150 },
+  { id: 'cSoil', key: 'soil_moisture', color: '#4ade80', unit: '%', min: 0, max: 110 },
+];
+const charts = {};
+const chartDataBuffer = {
+  cTempHum: { temperature: [], humidity: [] },
+  cLight: [],
+  cPres: [],
+  cSoil: []
+};
+const MAX_CHART_POINTS = 100;
+
+function makeAxis(color, min, max) {
+  const axis = {
+    ticks: { color: '#8b95b0', maxRotation: 0, font: { size: 11 } },
+    grid:  { display: false }
+  };
+  if (min !== undefined && max !== undefined) {
+    axis.min = min;
+    axis.max = max;
+  }
+  return axis;
+}
+
+function initCharts() {
+  CHART_CFG.forEach(cfg => {
+    const { id, dual } = cfg;
+    
+    if (dual) {
+      // 双轴图表（温度 & 湿度）
+      const { keys, colors, units, mins, maxs } = cfg;
+      charts[id] = new Chart($(id), {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: '环境温度',
+              data: chartDataBuffer[id][keys[0]] || [],
+              borderColor: colors[0],
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              pointRadius: 2,
+              pointHoverRadius: 4,
+              tension: 0.35,
+              yAxisID: 'y1',
+            },
+            {
+              label: '环境湿度',
+              data: chartDataBuffer[id][keys[1]] || [],
+              borderColor: colors[1],
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              pointRadius: 2,
+              pointHoverRadius: 4,
+              tension: 0.35,
+              yAxisID: 'y2',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 250 },
+          plugins: {
+            legend: { 
+              display: true,
+              position: 'top',
+              labels: { color: '#8b95b0', font: { size: 11 }, padding: 10 }
+            },
+            tooltip: {
+              callbacks: {
+                title: ctx => fmtTs(ctx[0].raw.x),
+                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} ${units[ctx.datasetIndex]}`,
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: { tooltipFormat: 'yyyy-MM-dd HH:mm:ss', displayFormats: { minute: 'HH:mm', hour: 'MM-dd HH:mm', day: 'yyyy-MM-dd' } },
+              ticks: { color: '#8b95b0', maxRotation: 0, font: { size: 11 } },
+              grid: { display: false }
+            },
+            y1: {
+              type: 'linear',
+              position: 'left',
+              min: mins[0],
+              max: maxs[0],
+              ticks: { color: colors[0], font: { size: 11 } },
+              grid: { display: false }
+            },
+            y2: {
+              type: 'linear',
+              position: 'right',
+              min: mins[1],
+              max: maxs[1],
+              ticks: { color: colors[1], font: { size: 11 } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    } else {
+      // 单轴图表
+      const { key, color, unit, min, max } = cfg;
+      charts[id] = new Chart($(id), {
+        type: 'line',
+        data: {
+          datasets: [{
+            data: chartDataBuffer[id] || [],
+            borderColor: color,
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 2,
+            pointHoverRadius: 4,
+            tension: 0.35,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 250 },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: ctx => fmtTs(ctx[0].raw.x),
+                label:  ctx => ` ${ctx.parsed.y.toFixed(2)} ${unit}`,
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: { tooltipFormat: 'yyyy-MM-dd HH:mm:ss', displayFormats: { minute: 'HH:mm', hour: 'MM-dd HH:mm', day: 'yyyy-MM-dd' } },
+              ticks: { color: '#8b95b0', maxRotation: 0, font: { size: 11 } },
+              grid: { display: false }
+            },
+            y: {
+              min: min,
+              max: max,
+              ticks: { color: '#8b95b0', font: { size: 11 } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+  });
+}
+
+function updateChartsRealtime(data) {
+  CHART_CFG.forEach(cfg => {
+    const { id, dual } = cfg;
+    
+    if (dual) {
+      // 双轴图表
+      const { keys } = cfg;
+      keys.forEach((key, idx) => {
+        if (data[key] !== null && data[key] !== undefined) {
+          const newPoint = { x: data.timestamp, y: data[key] };
+          mergeChartData(chartDataBuffer[id][key], newPoint);
+          
+          if (chartsReady && charts[id]) {
+            charts[id].data.datasets[idx].data = chartDataBuffer[id][key];
+          }
+        }
+      });
+      
+      if (chartsReady && charts[id]) {
+        charts[id].update('none');
+      }
+    } else {
+      // 单轴图表
+      const { key } = cfg;
+      if (data[key] !== null && data[key] !== undefined) {
+        const newPoint = { x: data.timestamp, y: data[key] };
+        mergeChartData(chartDataBuffer[id], newPoint);
+        
+        if (chartsReady && charts[id]) {
+          charts[id].data.datasets[0].data = chartDataBuffer[id];
+          charts[id].update('none');
+        }
+      }
+    }
+  });
+}
+
+function setPreset(hours) {
+  const now   = new Date();
+  const start = new Date(now - hours * 3600000);
+  const fmt   = d => new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  $('chartStart').value = fmt(start);
+  $('chartEnd').value   = fmt(now);
+  loadCharts();
+}
+
+async function loadCharts() {
+  const s = $('chartStart').value;
+  const e = $('chartEnd').value;
+  let url = '/api/data?limit=1000';
+  if (s) url += '&start=' + encodeURIComponent(new Date(s).toISOString());
+  if (e) url += '&end='   + encodeURIComponent(new Date(e).toISOString());
+  try {
+    const rows   = await (await fetch(url)).json();
+    const sorted = rows.slice().reverse();
+    
+    CHART_CFG.forEach(cfg => {
+      const { id, dual } = cfg;
+      
+      if (dual) {
+        // 双轴图表
+        const { keys } = cfg;
+        chartDataBuffer[id][keys[0]] = sorted
+          .filter(r => r[keys[0]] !== null && r[keys[0]] !== undefined)
+          .map(r => ({ x: r.timestamp, y: r[keys[0]] }))
+          .slice(-MAX_CHART_POINTS);
+        chartDataBuffer[id][keys[1]] = sorted
+          .filter(r => r[keys[1]] !== null && r[keys[1]] !== undefined)
+          .map(r => ({ x: r.timestamp, y: r[keys[1]] }))
+          .slice(-MAX_CHART_POINTS);
+        
+        if (charts[id]) {
+          charts[id].data.datasets[0].data = chartDataBuffer[id][keys[0]];
+          charts[id].data.datasets[1].data = chartDataBuffer[id][keys[1]];
+          charts[id].update('active');
+        }
+      } else {
+        // 单轴图表
+        const { key } = cfg;
+        const data = sorted
+          .filter(r => r[key] !== null && r[key] !== undefined)
+          .map(r => ({ x: r.timestamp, y: r[key] }));
+        
+        chartDataBuffer[id] = data.slice(-MAX_CHART_POINTS);
+        
+        if (charts[id]) {
+          charts[id].data.datasets[0].data = chartDataBuffer[id];
+          charts[id].update('active');
+        }
+      }
+    });
+  } catch (err) { console.error('Chart load error:', err); }
+}
+
+function mergeChartData(existingData, newPoint) {
+  // 检查是否已存在相同时间戳的数据点
+  const index = existingData.findIndex(p => p.x === newPoint.x);
+  if (index >= 0) {
+    // 更新现有点
+    existingData[index] = newPoint;
+  } else {
+    // 添加新点并按时间排序
+    existingData.push(newPoint);
+    existingData.sort((a, b) => new Date(a.x) - new Date(b.x));
+  }
+  
+  // 限制数据点数量
+  if (existingData.length > MAX_CHART_POINTS) {
+    existingData.splice(0, existingData.length - MAX_CHART_POINTS);
+  }
+}
+
+async function loadInitialChartData() {
+  // 页面加载时预加载最近的数据到缓冲区
+  try {
+    const rows = await (await fetch('/api/data?limit=100')).json();
+    const sorted = rows.slice().reverse();
+    
+    CHART_CFG.forEach(cfg => {
+      const { id, dual } = cfg;
+      
+      if (dual) {
+        const { keys } = cfg;
+        chartDataBuffer[id][keys[0]] = sorted
+          .filter(r => r[keys[0]] !== null && r[keys[0]] !== undefined)
+          .map(r => ({ x: r.timestamp, y: r[keys[0]] }));
+        chartDataBuffer[id][keys[1]] = sorted
+          .filter(r => r[keys[1]] !== null && r[keys[1]] !== undefined)
+          .map(r => ({ x: r.timestamp, y: r[keys[1]] }));
+      } else {
+        const { key } = cfg;
+        chartDataBuffer[id] = sorted
+          .filter(r => r[key] !== null && r[key] !== undefined)
+          .map(r => ({ x: r.timestamp, y: r[key] }));
+      }
+    });
+  } catch (err) {
+    console.warn('Initial chart data load failed:', err);
+  }
+}
+
+// ── Debug Logs ────────────────────────────────────────────────────────
+let allLogs = [];
+
+async function loadLogs() {
+  try {
+    const rows = await (await fetch('/api/logs?limit=500')).json();
+    allLogs    = rows.slice().reverse(); // oldest first
+    renderAllLogs();
+  } catch (e) { console.error(e); }
+}
+
+function renderAllLogs() {
+  const filter = $('selLevel').value;
+  const body   = $('logBody');
+  body.innerHTML = '';
+  const visible = filter ? allLogs.filter(l => l.level === filter) : allLogs;
+  visible.forEach(l => appendRowToBody(l, body));
+  $('logCount').textContent = visible.length + ' 条';
+  scrollLogs();
+}
+
+function pushLogLine(d) {
+  allLogs.push(d);
+  if (allLogs.length > 2000) allLogs.shift();
+  const filter = $('selLevel').value;
+  if (filter && d.level !== filter) return;
+  const body = $('logBody');
+  appendRowToBody(d, body);
+  $('logCount').textContent = body.children.length + ' 条';
+  scrollLogs();
+}
+
+function appendRowToBody(d, body) {
+  const lvl = (d.level || 'INFO').toUpperCase();
+  const row = document.createElement('div');
+  row.className = `log-row level-${lvl}`;
+  row.innerHTML = `
+    <span class="l-time">${fmtTs(d.timestamp)}</span>
+    <span class="l-level ${lvl}">${lvl}</span>
+    <span class="l-msg">${escHtml(d.message)}</span>`;
+  body.appendChild(row);
+}
+
+function scrollLogs() {
+  if ($('chkAutoScroll').checked) {
+    const body = $('logBody');
+    body.scrollTop = body.scrollHeight;
+  }
+}
+
+function applyFilter() { renderAllLogs(); }
+function clearLogView() { $('logBody').innerHTML = ''; $('logCount').textContent = '0 条'; }
+
+// ── Init ──────────────────────────────────────────────────────────────
+initTheme();
+loadDashboard();
+loadHeartbeatStatus();
+loadInitialChartData();
+connectSSE();
+startHeartbeatMonitor();
+</script>
+</body>
+</html>
