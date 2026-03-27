@@ -361,8 +361,42 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
   .page { padding: 14px 14px; }
 }
 @media (max-width: 600px) {
+  nav { padding: 0 12px; height: auto; flex-wrap: wrap; gap: 6px; padding-top: 8px; padding-bottom: 8px; }
+  .logo { font-size: 14px; margin-right: 8px; }
+  .logo img { width: 24px; height: 24px; }
+  .tab { padding: 5px 10px; font-size: 12px; }
+  .nav-right { width: 100%; justify-content: space-between; margin-left: 0; margin-top: 6px; }
+  .theme-toggle { padding: 4px 8px; font-size: 12px; }
+  .heartbeat-status { min-width: auto; max-width: none; flex: 1; padding: 4px 8px; }
+  .hb-timer { font-size: 11px; }
+  .hb-label { font-size: 9px; }
+  
   .sensor-grid { grid-template-columns: 1fr 1fr; }
+  .s-tile { padding: 10px 12px; }
+  .s-label { font-size: 10px; }
+  .s-val { font-size: 22px; }
+  .s-unit { font-size: 12px; }
+  .s-time { font-size: 9px; }
+  
   .gal-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .page { padding: 12px; }
+  .card { padding: 14px 16px; }
+  .card-title { font-size: 10px; margin-bottom: 12px; }
+  
+  .chart-card h4 { font-size: 12px; }
+  .chart-wrap { height: 180px; }
+  
+  .event-row { padding: 10px 12px; font-size: 12px; }
+  .event-tag { font-size: 10px; padding: 2px 6px; }
+  .event-ts { font-size: 10px; }
+  
+  .log-row { padding: 8px 10px; font-size: 11px; }
+  .log-ts { font-size: 9px; }
+  .log-lvl { font-size: 9px; padding: 2px 5px; }
+  
+  .time-range-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .time-range-bar input { font-size: 12px; }
+  .time-range-bar button { font-size: 12px; padding: 6px 12px; }
 }
 </style>
 </head>

@@ -1,0 +1,40 @@
+# Node modules
+node_modules/
+
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Log files
+*.log
+
+# Image uploads
+pic/
+public/pic/
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
