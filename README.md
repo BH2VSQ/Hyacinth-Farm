@@ -11,9 +11,32 @@ npm install
 node server.js
 ```
 
-浏览器访问 `http://localhost:3000`
+服务器启动后会自动生成一个32位的 Session Key 并显示在控制台中。
+
+浏览器访问 `http://localhost:3000`，网页可直接访问，无需认证。
 
 > 默认端口为 3000，可在server.js中修改，搜索 `const PORT = parseInt(process.env.PORT) || 3000;` 将其中的3000端口修改为想要实际部署使用的端口
+
+---
+
+## 安全认证
+
+系统采用 Session Key 认证机制保护 API 接口：
+
+- 服务器首次启动时自动生成32位随机 Session Key
+- Session Key 保存在 `.session_key` 文件中（已加入 .gitignore）
+- **网页访问无需认证**，可直接访问 `http://localhost:3000`
+- **所有 POST API 接口需要认证**（数据上传、事件上报、日志上传等）
+- **所有 GET API 接口无需认证**（数据查询、图片列表等，供网页使用）
+- ESP32 设备需要在代码中配置 Session Key 用于数据上传
+
+**查看 Session Key：**
+
+```bash
+# 方式1：查看服务器启动日志
+# 方式2：读取文件
+cat .session_key
+```
 
 ---
 
@@ -22,6 +45,7 @@ node server.js
 ```
 hyacinth-farm/
 ├── server.js          主服务文件（后端 + 静态资源）
+├── .session_key       Session Key 文件（自动生成，不提交到 Git）
 ├── package.json
 ├── README.md
 ├── public/
@@ -41,7 +65,7 @@ hyacinth-farm/
 | -------- | ------------------------------------------ |
 | **仪表板**  | 最新图像 + 实时传感器数据 + 设备事件，通过 SSE 自动刷新，无需手动刷新页面 |
 | **相册**   | 历史照片浏览，按时间倒序排列，支持分页与全屏预览                   |
-| **数据图表** | 环境温度&湿度、光照强度、气压、土壤湿度历史折线图，支持自定义时间范围 |
+| **数据图表** | 环境温度&湿度、光照强度、气压、土壤湿度历史折线图，支持自定义时间范围        |
 | **调试日志** | ESP32 调试信息实时显示，支持按级别过滤、自动滚动                |
 
 ---
@@ -53,6 +77,10 @@ hyacinth-farm/
 - 所有 POST 接口（除 `/api/image` 外）均接收 `Content-Type: application/json`
 - 所有接口返回 JSON，成功时包含 `"status": "ok"`，失败时包含 `"status": "error"` 与 `"message"`
 - `timestamp` 字段统一使用 **ISO 8601 格式**，例如 `2024-07-15T08:30:00.000Z`；若不传则由服务端以接收时间补充
+- **所有 API 接口均需要 Session Key 认证**：
+  - 方式1：在 HTTP 头中添加 `X-Session-Key: <your-32-char-key>`
+  - 方式2：在 Query 参数中添加 `?session_key=<your-32-char-key>`
+  - 认证失败返回 `401 Unauthorized`
 
 ---
 
@@ -62,11 +90,12 @@ hyacinth-farm/
 
 ESP32-CAM 将 JPEG 原始二进制数据作为请求体发送。
 
-| 参数来源   | 参数名           | 说明                |
-| ------ | ------------- | ----------------- |
-| Query  | `timestamp`   | 拍摄时间 ISO 8601（可选） |
-| Header | `X-Timestamp` | 同上，备选方式           |
-| Body   | 原始二进制         | JPEG 图像数据         |
+| 参数来源   | 参数名             | 说明                |
+| ------ | --------------- | ----------------- |
+| Header | `X-Session-Key` | Session Key（必须）   |
+| Query  | `timestamp`     | 拍摄时间 ISO 8601（可选） |
+| Header | `X-Timestamp`   | 同上，备选方式           |
+| Body   | 原始二进制           | JPEG 图像数据         |
 
 **成功响应**
 
@@ -80,6 +109,7 @@ ESP32-CAM 将 JPEG 原始二进制数据作为请求体发送。
 HTTPClient http;
 http.begin("http://192.168.1.100:3000/api/image");
 http.addHeader("Content-Type", "image/jpeg");
+http.addHeader("X-Session-Key", "your-32-character-session-key-here");
 http.addHeader("X-Timestamp", getISO8601Time());   // 自行实现时间获取
 int code = http.POST(fb->buf, fb->len);
 http.end();
@@ -391,11 +421,13 @@ String getISO8601() {
 ```cpp
 // 设置心跳间隔（秒）
 const int HEARTBEAT_INTERVAL = 60;
+const char* SESSION_KEY = "your-32-character-session-key-here";
 
 // 发送心跳
 HTTPClient http;
 http.begin("http://192.168.1.100:3000/api/heartbeat");
 http.addHeader("Content-Type", "application/json; charset=utf-8");
+http.addHeader("X-Session-Key", SESSION_KEY);
 
 // 计算下一次心跳时间
 String nextTime = getISO8601Time(HEARTBEAT_INTERVAL);

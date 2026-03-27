@@ -1,7 +1,8 @@
 ﻿# Hyacinth Farm Monitor - Interactive API Tool
 
 param(
-    [string]$BaseUrl = "http://127.0.0.1:3000"
+    [string]$BaseUrl = "http://127.0.0.1:3000",
+    [string]$SessionKey = ""
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -15,7 +16,18 @@ $ColorTitle = "Magenta"
 $ColorPrompt = "White"
 
 $script:BaseUrl = $BaseUrl
+$script:SessionKey = $SessionKey
 $script:LastResponse = $null
+
+# Prompt for session key if not provided
+if (-not $script:SessionKey) {
+    Write-Host "请输入 Session Key (32位字符): " -ForegroundColor $ColorPrompt -NoNewline
+    $script:SessionKey = Read-Host
+    if ($script:SessionKey.Length -ne 32) {
+        Write-Host "错误: Session Key 必须是32位字符" -ForegroundColor $ColorError
+        exit 1
+    }
+}
 
 function Write-Title {
     param([string]$Text)
@@ -58,15 +70,19 @@ function Invoke-ApiRequest {
         $uri = "$script:BaseUrl$Endpoint"
         Write-Info "Request: $Method $uri"
         
+        $headers = @{
+            "X-Session-Key" = $script:SessionKey
+        }
+        
         if ($Method -eq "GET") {
-            $response = Invoke-RestMethod -Uri $uri -Method Get -ErrorAction Stop
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $headers -ErrorAction Stop
         } else {
             $jsonBody = $Body | ConvertTo-Json -Depth 10
             Write-Host "Body:" -ForegroundColor Gray
             Write-Host $jsonBody -ForegroundColor Gray
             
             $utf8Bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
-            $response = Invoke-RestMethod -Uri $uri -Method $Method -Body $utf8Bytes -ContentType "$ContentType; charset=utf-8" -ErrorAction Stop
+            $response = Invoke-RestMethod -Uri $uri -Method $Method -Body $utf8Bytes -ContentType "$ContentType; charset=utf-8" -Headers $headers -ErrorAction Stop
         }
         
         $script:LastResponse = $response
@@ -453,7 +469,11 @@ function Handle-Image {
                     Write-Info "Uploading..."
                     $fileBytes = [System.IO.File]::ReadAllBytes($imagePath)
                     
-                    $response = Invoke-RestMethod -Uri $uri -Method Post -Body $fileBytes -ContentType "image/jpeg" -ErrorAction Stop
+                    $headers = @{
+                        "X-Session-Key" = $script:SessionKey
+                    }
+                    
+                    $response = Invoke-RestMethod -Uri $uri -Method Post -Body $fileBytes -ContentType "image/jpeg" -Headers $headers -ErrorAction Stop
                     
                     Write-Success "Upload success"
                     Write-Host "Response:" -ForegroundColor Gray
@@ -508,12 +528,16 @@ function Run-FullTest {
         $script:TestTotal++
         try {
             $uri = "$script:BaseUrl$Endpoint"
+            $headers = @{
+                "X-Session-Key" = $script:SessionKey
+            }
+            
             if ($Method -eq "GET") {
-                $response = Invoke-RestMethod -Uri $uri -Method Get -ErrorAction Stop
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $headers -ErrorAction Stop
             } else {
                 $jsonBody = $Body | ConvertTo-Json -Depth 10
                 $utf8Bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
-                $response = Invoke-RestMethod -Uri $uri -Method $Method -Body $utf8Bytes -ContentType "application/json; charset=utf-8" -ErrorAction Stop
+                $response = Invoke-RestMethod -Uri $uri -Method $Method -Body $utf8Bytes -ContentType "application/json; charset=utf-8" -Headers $headers -ErrorAction Stop
             }
             $script:TestPassed++
             Write-Host "  [OK] " -NoNewline -ForegroundColor $ColorSuccess

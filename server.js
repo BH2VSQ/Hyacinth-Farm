@@ -5,8 +5,38 @@ const initSqlJs = require('sql.js');
 const cors     = require('cors');
 const fs       = require('fs');
 const path     = require('path');
+const crypto   = require('crypto');
 
 const app = express();
+
+// ── Session Key ───────────────────────────────────────────────────────
+const SESSION_KEY_FILE = path.join(__dirname, '.session_key');
+let SESSION_KEY = '';
+
+function generateSessionKey() {
+  return crypto.randomBytes(16).toString('hex'); // 32 characters
+}
+
+function loadOrCreateSessionKey() {
+  if (fs.existsSync(SESSION_KEY_FILE)) {
+    SESSION_KEY = fs.readFileSync(SESSION_KEY_FILE, 'utf8').trim();
+    console.log('Session key loaded from file');
+  } else {
+    SESSION_KEY = generateSessionKey();
+    fs.writeFileSync(SESSION_KEY_FILE, SESSION_KEY, 'utf8');
+    console.log('New session key generated and saved');
+  }
+  console.log(`Session Key: ${SESSION_KEY}`);
+}
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  const key = req.headers['x-session-key'] || req.query.session_key;
+  if (key !== SESSION_KEY) {
+    return res.status(401).json({ status: 'error', message: 'Invalid or missing session key' });
+  }
+  next();
+}
 
 // ── Middleware ────────────────────────────────────────────────────────
 app.use(cors());
@@ -153,7 +183,7 @@ app.get('/api/stream', (req, res) => {
 // ESP32-CAM sends raw JPEG binary in the request body.
 // Optional query param: ?timestamp=<ISO8601>
 // Optional header:      X-Timestamp: <ISO8601>
-app.post('/api/image', (req, res) => {
+app.post('/api/image', requireAuth, (req, res) => {
   const ts       = normalizeTimestamp(req.query.timestamp || req.headers['x-timestamp']);
   const filename = ts.replace(/[:.]/g, '-') + '.jpg';
   const filepath = path.join(PIC_DIR, filename);
@@ -198,7 +228,7 @@ app.use('/pic', express.static(PIC_DIR));
 
 // ── POST /api/heartbeat ────────────────────────────────────────────────
 // ESP32 sends heartbeat with interval and next expected time
-app.post('/api/heartbeat', (req, res) => {
+app.post('/api/heartbeat', requireAuth, (req, res) => {
   const ts = normalizeTimestamp(req.body?.timestamp || req.query.timestamp || req.headers['x-timestamp']);
   const interval = req.body?.interval || req.query.interval || 60;
   const nextTime = req.body?.nextHeartbeat || req.query.nextHeartbeat;
@@ -262,7 +292,7 @@ app.get('/api/heartbeat', (req, res) => {
 // ── POST /api/data ─────────────────────────────────────────────────────
 // Body (JSON): { timestamp, temperature, humidity, soil_moisture, pressure, light }
 // At least one numeric sensor field is required.
-app.post('/api/data', (req, res) => {
+app.post('/api/data', requireAuth, (req, res) => {
   const { timestamp, temperature, humidity, soil_moisture, pressure, light } = req.body || {};
   const ts  = normalizeTimestamp(timestamp);
   const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
@@ -317,7 +347,7 @@ app.get('/api/data', (req, res) => {
 // ── POST /api/event ────────────────────────────────────────────────────
 // Body (JSON): { timestamp, event, detail }
 // event examples: "watering_start", "watering_stop", "refill_water"
-app.post('/api/event', (req, res) => {
+app.post('/api/event', requireAuth, (req, res) => {
   const { timestamp, event, detail } = req.body || {};
   if (!event || typeof event !== 'string') {
     return sendError(res, 400, '"event" string field is required');
@@ -354,7 +384,7 @@ app.get('/api/events', (req, res) => {
 // ── POST /api/log ──────────────────────────────────────────────────────
 // Body (JSON): { timestamp, level, message }
 // level: "DEBUG" | "INFO" | "WARN" | "ERROR"  (default: "INFO")
-app.post('/api/log', (req, res) => {
+app.post('/api/log', requireAuth, (req, res) => {
   const { timestamp, level, message } = req.body || {};
   if (!message || typeof message !== 'string') {
     return sendError(res, 400, '"message" string field is required');
@@ -421,11 +451,14 @@ app.use((err, req, res, _next) => {
 // ── Start ──────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT) || 3000;
 
+loadOrCreateSessionKey();
+
 initDatabase().then(() => {
   app.listen(PORT, () => {
     console.log(`\n🌱 Hyacinth Farm Server running on http://localhost:${PORT}`);
     console.log(`   Dashboard  → http://localhost:${PORT}`);
-    console.log(`   API Status → http://localhost:${PORT}/api/status\n`);
+    console.log(`   API Status → http://localhost:${PORT}/api/status`);
+    console.log(`   Session Key: ${SESSION_KEY}\n`);
   });
 }).catch(err => {
   console.error('Failed to initialize database:', err);
