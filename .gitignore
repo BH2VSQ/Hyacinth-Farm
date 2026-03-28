@@ -17,6 +17,7 @@ logs/
 # Image uploads
 pic/
 public/pic/
+*.jpg
 
 # Session key
 .session_key
