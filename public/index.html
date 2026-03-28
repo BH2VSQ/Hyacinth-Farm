@@ -1005,7 +1005,16 @@ async function loadDashboard() {
     const rows = await r.json();
     if (rows.length) {
       $('eventList').innerHTML = '';
-      rows.forEach(d => prependEvent(d, 5));
+      // rows已经是最新的在前（从API返回），直接按顺序添加
+      rows.forEach(d => {
+        const row = document.createElement('div');
+        row.className = 'event-row';
+        row.innerHTML = `
+          <span class="event-tag">${escHtml(d.event)}</span>
+          <span class="event-detail">${escHtml(d.detail || '')}</span>
+          <span class="event-ts">${fmtTs(d.timestamp)}</span>`;
+        $('eventList').appendChild(row);
+      });
     }
   } catch (e) { console.warn('Dashboard events load:', e); }
 
@@ -1088,7 +1097,16 @@ async function loadEvents() {
     const rows = await r.json();
     if (rows.length) {
       list.innerHTML = '';
-      rows.forEach(prependEventFull);
+      // rows已经是最新的在前（从API返回），直接按顺序添加
+      rows.forEach(d => {
+        const row = document.createElement('div');
+        row.className = 'event-row';
+        row.innerHTML = `
+          <span class="event-tag">${escHtml(d.event)}</span>
+          <span class="event-detail">${escHtml(d.detail || '')}</span>
+          <span class="event-ts">${fmtTs(d.timestamp)}</span>`;
+        list.appendChild(row);
+      });
     } else {
       list.innerHTML = '<div class="empty-msg">暂无事件记录</div>';
     }
