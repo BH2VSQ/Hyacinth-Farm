@@ -109,6 +109,7 @@ async function initDatabase() {
     soil_moisture REAL,
     pressure     REAL,
     light        REAL,
+    voltage      REAL,
     received_at  DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -290,10 +291,10 @@ app.get('/api/heartbeat', (req, res) => {
 });
 
 // ── POST /api/data ─────────────────────────────────────────────────────
-// Body (JSON): { timestamp, temperature, humidity, soil_moisture, pressure, light }
+// Body (JSON): { timestamp, temperature, humidity, soil_moisture, pressure, light, voltage }
 // At least one numeric sensor field is required.
 app.post('/api/data', requireAuth, (req, res) => {
-  const { timestamp, temperature, humidity, soil_moisture, pressure, light } = req.body || {};
+  const { timestamp, temperature, humidity, soil_moisture, pressure, light, voltage } = req.body || {};
   const ts  = normalizeTimestamp(timestamp);
   const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
 
@@ -302,20 +303,21 @@ app.post('/api/data', requireAuth, (req, res) => {
   const SM = num(soil_moisture);
   const P  = num(pressure);
   const L  = num(light);
+  const V  = num(voltage);
 
-  if ([T, H, SM, P, L].every(v => v === null)) {
+  if ([T, H, SM, P, L, V].every(v => v === null)) {
     return sendError(res, 400, 'At least one numeric sensor field is required');
   }
 
   try {
     const id = dbRun(
-      `INSERT INTO sensor_data (timestamp, temperature, humidity, soil_moisture, pressure, light)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [ts, T, H, SM, P, L]
+      `INSERT INTO sensor_data (timestamp, temperature, humidity, soil_moisture, pressure, light, voltage)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [ts, T, H, SM, P, L, V]
     );
 
-    const record = { id, timestamp: ts, temperature: T, humidity: H, soil_moisture: SM, pressure: P, light: L };
-    const logLine = `[${ts}] T=${T ?? 'N/A'} H=${H ?? 'N/A'} SM=${SM ?? 'N/A'} P=${P ?? 'N/A'} L=${L ?? 'N/A'}`;
+    const record = { id, timestamp: ts, temperature: T, humidity: H, soil_moisture: SM, pressure: P, light: L, voltage: V };
+    const logLine = `[${ts}] T=${T ?? 'N/A'} H=${H ?? 'N/A'} SM=${SM ?? 'N/A'} P=${P ?? 'N/A'} L=${L ?? 'N/A'} V=${V ?? 'N/A'}`;
     appendLog(SENSOR_LOG, logLine);
     broadcast('data', record);
     res.json({ status: 'ok', id, timestamp: ts });

@@ -260,10 +260,10 @@ function Handle-Sensor {
                 $data = @{
                     timestamp = Get-ISO8601Timestamp
                     temperature = 22.5
-                    humidity = 65.3
                     soil_moisture = 45.8
-                    pressure = 101.3
                     light = 850
+                    pressure = 101.3
+                    voltage = 3.7
                 }
                 Invoke-ApiRequest -Method "POST" -Endpoint "/api/data" -Body $data
                 Wait-UserInput
@@ -274,18 +274,18 @@ function Handle-Sensor {
                 Write-Host ""
                 
                 $temp = Read-Host "Temperature (C) [22.5]"
-                $hum = Read-Host "Humidity (%) [65.0]"
                 $soil = Read-Host "Soil Moisture (%) [45.0]"
-                $pres = Read-Host "Pressure (kPa) [101.3]"
                 $light = Read-Host "Light [800]"
+                $pres = Read-Host "Pressure (kPa) [101.3]"
+                $volt = Read-Host "Voltage (V) [3.7]"
                 
                 $data = @{
                     timestamp = Get-ISO8601Timestamp
                     temperature = if ($temp) { [double]$temp } else { 22.5 }
-                    humidity = if ($hum) { [double]$hum } else { 65.0 }
                     soil_moisture = if ($soil) { [double]$soil } else { 45.0 }
-                    pressure = if ($pres) { [double]$pres } else { 101.3 }
                     light = if ($light) { [double]$light } else { 800 }
+                    pressure = if ($pres) { [double]$pres } else { 101.3 }
+                    voltage = if ($volt) { [double]$volt } else { 3.7 }
                 }
                 
                 Write-Host ""
@@ -580,10 +580,10 @@ function Run-FullTest {
     Test-Api -Name "POST /api/data" -Method "POST" -Endpoint "/api/data" -Body @{
         timestamp = Get-ISO8601Timestamp
         temperature = 22.5
-        humidity = 65.3
         soil_moisture = 45.8
-        pressure = 101.3
         light = 850
+        pressure = 101.3
+        voltage = 3.7
     }
     Start-Sleep -Milliseconds 500
     Test-Api -Name "GET /api/data" -Method "GET" -Endpoint "/api/data?limit=5"

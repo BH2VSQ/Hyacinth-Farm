@@ -87,6 +87,7 @@ nav {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; color: var(--text2);
   transition: all .15s;
+  height: 38px;
 }
 .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
 
@@ -96,6 +97,7 @@ nav {
   padding: 4px 12px; background: var(--surface2);
   border: 1px solid var(--border); border-radius: 6px;
   min-width: 340px; max-width: 340px;
+  height: 38px;
 }
 .hb-dot {
   width: 10px; height: 10px; border-radius: 50%;
@@ -146,7 +148,7 @@ nav {
 .dash-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   gap: 18px;
 }
 .dash-image-card { grid-column: 1; grid-row: 1; }
@@ -163,7 +165,7 @@ nav {
 .latest-img-wrap img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
 .img-meta { margin-top: 8px; font-size: 12px; color: var(--text2); min-height: 16px; }
 
-.sensor-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.sensor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .s-tile {
   background: var(--surface2); border-radius: 8px; padding: 12px 14px;
   border: 1px solid transparent; transition: border-color .2s;
@@ -190,6 +192,13 @@ nav {
 .event-detail { flex: 1; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .event-ts { font-size: 11px; color: var(--text2); white-space: nowrap; flex-shrink: 0; }
 .empty-msg { color: var(--text2); font-size: 13px; padding: 16px 0; text-align: center; }
+
+/* Log Preview */
+.log-preview { overflow: hidden; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; }
+.log-preview .log-row { padding: 6px 0; }
+.log-preview .l-time { min-width: 140px; font-size: 11px; }
+.log-preview .l-level { width: 50px; font-size: 10px; padding: 2px 6px; }
+.log-preview .l-msg { font-size: 12px; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
@@ -223,7 +232,7 @@ nav {
 }
 .charts-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   gap: 16px;
 }
 .chart-card { 
@@ -371,18 +380,36 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
   .hb-timer { font-size: 11px; }
   .hb-label { font-size: 9px; }
   
-  .sensor-grid { grid-template-columns: 1fr 1fr; }
+  .sensor-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .s-tile { padding: 10px 12px; }
   .s-label { font-size: 10px; }
   .s-val { font-size: 22px; }
   .s-unit { font-size: 12px; }
   .s-time { font-size: 9px; }
   
+  .log-preview .log-row { padding: 6px 8px; font-size: 11px; }
+  .log-preview .l-time { min-width: 120px; font-size: 10px; }
+  .log-preview .l-level { width: 45px; font-size: 9px; }
+  .log-preview .l-msg { font-size: 11px; }
+  
   .gal-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .page { padding: 12px; }
   .card { padding: 14px 16px; }
   .card-title { font-size: 10px; margin-bottom: 12px; }
   
+  .chart-bar { gap: 6px; }
+  .chart-bar input[type="datetime-local"] {
+    max-width: 130px;
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+  .chart-bar .ctrl-label {
+    font-size: 11px;
+  }
+  .chart-bar .btn {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
   .chart-card h4 { font-size: 12px; }
   .chart-wrap { height: 180px; }
   
@@ -394,9 +421,23 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
   .log-ts { font-size: 9px; }
   .log-lvl { font-size: 9px; padding: 2px 5px; }
   
-  .time-range-bar { flex-direction: column; align-items: stretch; gap: 8px; }
-  .time-range-bar input { font-size: 12px; }
-  .time-range-bar button { font-size: 12px; padding: 6px 12px; }
+  .chart-bar { gap: 6px; }
+  .chart-bar input[type="datetime-local"] {
+    flex: 1;
+    min-width: 110px;
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+  .chart-bar .ctrl-label {
+    font-size: 11px;
+  }
+  .chart-bar .btn {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+  .chart-bar .preset-btns {
+    width: 100%;
+  }
 }
 </style>
 </head>
@@ -407,10 +448,10 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
     <img src="/logo.png" alt="Logo" onerror="this.style.display='none'">
     Hyacinth Farm
   </div>
-  <button class="tab active" data-tab="dashboard" onclick="showTab(this,'dashboard')">仪表板</button>
+  <button class="tab active" data-tab="dashboard" onclick="showTab(this,'dashboard')">首页</button>
   <button class="tab" data-tab="gallery"   onclick="showTab(this,'gallery')">相册</button>
-  <button class="tab" data-tab="charts"    onclick="showTab(this,'charts')">数据图表</button>
-  <button class="tab" data-tab="logs"      onclick="showTab(this,'logs')">调试日志</button>
+  <button class="tab" data-tab="charts"    onclick="showTab(this,'charts')">数据</button>
+  <button class="tab" data-tab="logs"      onclick="showTab(this,'logs')">日志</button>
   <div class="nav-right">
     <button class="theme-toggle" onclick="toggleTheme()">
       <span id="themeIcon">🌙</span>
@@ -451,25 +492,25 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
           <div><span class="s-val" id="v-temp">--</span><span class="s-unit">°C</span></div>
           <div class="s-time" id="t-temp"></div>
         </div>
-        <div class="s-tile" id="tile-hum">
-          <div class="s-label">环境湿度</div>
-          <div><span class="s-val" id="v-hum">--</span><span class="s-unit">%</span></div>
-          <div class="s-time" id="t-hum"></div>
+        <div class="s-tile" id="tile-soil">
+          <div class="s-label">土壤湿度</div>
+          <div><span class="s-val" id="v-soil">--</span><span class="s-unit">%</span></div>
+          <div class="s-time" id="t-soil"></div>
         </div>
         <div class="s-tile" id="tile-light">
           <div class="s-label">光照强度</div>
           <div><span class="s-val" id="v-light">--</span><span class="s-unit">lx</span></div>
           <div class="s-time" id="t-light"></div>
         </div>
-        <div class="s-tile" id="tile-soil">
-          <div class="s-label">土壤湿度</div>
-          <div><span class="s-val" id="v-soil">--</span><span class="s-unit">%</span></div>
-          <div class="s-time" id="t-soil"></div>
-        </div>
         <div class="s-tile" id="tile-pres">
-          <div class="s-label">气压</div>
-          <div><span class="s-val" id="v-pres">--</span><span class="s-unit">hPa</span></div>
+          <div class="s-label">大气压强</div>
+          <div><span class="s-val" id="v-pres">--</span><span class="s-unit">kPa</span></div>
           <div class="s-time" id="t-pres"></div>
+        </div>
+        <div class="s-tile" id="tile-volt">
+          <div class="s-label">电池电压</div>
+          <div><span class="s-val" id="v-volt">--</span><span class="s-unit">V</span></div>
+          <div class="s-time" id="t-volt"></div>
         </div>
       </div>
       <div class="data-update-ts" id="dataUpdateTs"></div>
@@ -479,6 +520,12 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
     <div class="card dash-event-card">
       <div class="card-title">🔔 最近设备事件</div>
       <div class="event-list" id="eventList"><div class="empty-msg">暂无事件记录</div></div>
+    </div>
+
+    <!-- Debug Log Preview -->
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-title">📝 调试日志预览</div>
+      <div class="log-preview" id="logPreview"><div class="empty-msg">暂无日志记录</div></div>
     </div>
   </div>
 </div>
@@ -514,15 +561,19 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
 
   <div class="charts-grid">
     <div class="chart-card">
-      <h4>🌡💧 环境温度 & 湿度</h4>
-      <div class="chart-wrap"><canvas id="cTempHum"></canvas></div>
+      <h4>🌡 环境温度 (°C)</h4>
+      <div class="chart-wrap"><canvas id="cTemp"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>🔋 电池电压 (V)</h4>
+      <div class="chart-wrap"><canvas id="cVolt"></canvas></div>
     </div>
     <div class="chart-card">
       <h4>☀️ 光照强度 (lx)</h4>
       <div class="chart-wrap"><canvas id="cLight"></canvas></div>
     </div>
     <div class="chart-card">
-      <h4>🌬 气压 (kPa)</h4>
+      <h4>� 大气压强 (kPa)</h4>
       <div class="chart-wrap"><canvas id="cPres"></canvas></div>
     </div>
     <div class="chart-card">
@@ -762,7 +813,11 @@ function connectSSE() {
   });
   es.addEventListener('image', e => { const d = JSON.parse(e.data); setLatestImage(d.filename, d.timestamp); showBadge('badge-img'); });
   es.addEventListener('event', e => prependEvent(JSON.parse(e.data)));
-  es.addEventListener('log',   e => pushLogLine(JSON.parse(e.data)));
+  es.addEventListener('log',   e => { 
+    const data = JSON.parse(e.data);
+    pushLogLine(data);
+    updateLogPreview(data);
+  });
   es.addEventListener('heartbeat', e => { 
     const data = JSON.parse(e.data);
     recordHeartbeat(data); 
@@ -791,10 +846,10 @@ function setSensor(id, tileId, val, unit, ts) {
 
 function updateSensors(d) {
   setSensor('v-temp',  'tile-temp',  d.temperature,   '°C',  d.timestamp);
-  setSensor('v-hum',   'tile-hum',   d.humidity,      '%',   d.timestamp);
-  setSensor('v-light', 'tile-light', d.light,         'lx',  d.timestamp);
   setSensor('v-soil',  'tile-soil',  d.soil_moisture, '%',   d.timestamp);
-  setSensor('v-pres',  'tile-pres',  d.pressure,      'hPa', d.timestamp);
+  setSensor('v-light', 'tile-light', d.light,         'lx',  d.timestamp);
+  setSensor('v-pres',  'tile-pres',  d.pressure,      'kPa', d.timestamp);
+  setSensor('v-volt',  'tile-volt',  d.voltage,       'V',   d.timestamp);
   $('dataUpdateTs').textContent = '更新时间: ' + fmtTs(d.timestamp);
 }
 
@@ -810,6 +865,22 @@ function prependEvent(d) {
     <span class="event-ts">${fmtTs(d.timestamp)}</span>`;
   list.insertBefore(row, list.firstChild);
   while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+function updateLogPreview(d) {
+  const preview = $('logPreview');
+  const empty = preview.querySelector('.empty-msg');
+  if (empty) empty.remove();
+  
+  const lvl = (d.level || 'INFO').toUpperCase();
+  const row = document.createElement('div');
+  row.className = `log-row level-${lvl}`;
+  row.innerHTML = `
+    <span class="l-time">${fmtTs(d.timestamp)}</span>
+    <span class="l-level ${lvl}">${lvl}</span>
+    <span class="l-msg">${escHtml(d.message)}</span>`;
+  preview.insertBefore(row, preview.firstChild);
+  while (preview.children.length > 10) preview.removeChild(preview.lastChild);
 }
 
 async function loadDashboard() {
@@ -834,13 +905,18 @@ async function loadDashboard() {
     if (rows.length) {
       $('eventList').innerHTML = '';
       rows.forEach(prependEvent);
-      // prependEvent reverses order; re-sort descending
-      const list = $('eventList');
-      const children = Array.from(list.children).reverse();
-      list.innerHTML = '';
-      children.forEach(c => list.appendChild(c));
     }
   } catch (e) { console.warn('Dashboard events load:', e); }
+
+  // Recent logs preview
+  try {
+    const r = await fetch('/api/logs?limit=10');
+    const rows = await r.json();
+    if (rows.length) {
+      $('logPreview').innerHTML = '';
+      rows.forEach(updateLogPreview);
+    }
+  } catch (e) { console.warn('Dashboard logs load:', e); }
 }
 
 // ── Gallery ───────────────────────────────────────────────────────────
@@ -904,14 +980,16 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('lightbox'
 
 // ── Charts ────────────────────────────────────────────────────────────
 const CHART_CFG = [
-  { id: 'cTempHum', keys: ['temperature', 'humidity'], colors: ['#f87171', '#60a5fa'], units: ['°C', '%'], mins: [-20, 0], maxs: [90, 110], dual: true },
-  { id: 'cLight', key: 'light', color: '#fbbf24', unit: 'lx', min: 0, max: 2000 },
+  { id: 'cTemp', key: 'temperature', color: '#f87171', unit: '°C', min: -20, max: 90 },
+  { id: 'cVolt', key: 'voltage', color: '#fbbf24', unit: 'V', min: 0, max: 5 },
+  { id: 'cLight', key: 'light', color: '#60a5fa', unit: 'lx', min: 0, max: 2000 },
   { id: 'cPres', key: 'pressure', color: '#a78bfa', unit: 'kPa', min: 50, max: 150 },
   { id: 'cSoil', key: 'soil_moisture', color: '#4ade80', unit: '%', min: 0, max: 110 },
 ];
 const charts = {};
 const chartDataBuffer = {
-  cTempHum: { temperature: [], humidity: [] },
+  cTemp: [],
+  cVolt: [],
   cLight: [],
   cPres: [],
   cSoil: []
@@ -932,163 +1010,62 @@ function makeAxis(color, min, max) {
 
 function initCharts() {
   CHART_CFG.forEach(cfg => {
-    const { id, dual } = cfg;
-    
-    if (dual) {
-      // 双轴图表（温度 & 湿度）
-      const { keys, colors, units, mins, maxs } = cfg;
-      charts[id] = new Chart($(id), {
-        type: 'line',
-        data: {
-          datasets: [
-            {
-              label: '环境温度',
-              data: chartDataBuffer[id][keys[0]] || [],
-              borderColor: colors[0],
-              backgroundColor: 'transparent',
-              borderWidth: 2,
-              pointRadius: 2,
-              pointHoverRadius: 4,
-              tension: 0.35,
-              yAxisID: 'y1',
-            },
-            {
-              label: '环境湿度',
-              data: chartDataBuffer[id][keys[1]] || [],
-              borderColor: colors[1],
-              backgroundColor: 'transparent',
-              borderWidth: 2,
-              pointRadius: 2,
-              pointHoverRadius: 4,
-              tension: 0.35,
-              yAxisID: 'y2',
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 250 },
-          plugins: {
-            legend: { 
-              display: true,
-              position: 'top',
-              labels: { color: '#8b95b0', font: { size: 11 }, padding: 10 }
-            },
-            tooltip: {
-              callbacks: {
-                title: ctx => fmtTs(ctx[0].raw.x),
-                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} ${units[ctx.datasetIndex]}`,
-              }
-            }
-          },
-          scales: {
-            x: {
-              type: 'time',
-              time: { tooltipFormat: 'yyyy-MM-dd HH:mm:ss', displayFormats: { minute: 'HH:mm', hour: 'MM-dd HH:mm', day: 'yyyy-MM-dd' } },
-              ticks: { color: '#8b95b0', maxRotation: 0, font: { size: 11 } },
-              grid: { display: false }
-            },
-            y1: {
-              type: 'linear',
-              position: 'left',
-              min: mins[0],
-              max: maxs[0],
-              ticks: { color: colors[0], font: { size: 11 } },
-              grid: { display: false }
-            },
-            y2: {
-              type: 'linear',
-              position: 'right',
-              min: mins[1],
-              max: maxs[1],
-              ticks: { color: colors[1], font: { size: 11 } },
-              grid: { display: false }
+    const { id, key, color, unit, min, max } = cfg;
+    charts[id] = new Chart($(id), {
+      type: 'line',
+      data: {
+        datasets: [{
+          data: chartDataBuffer[id] || [],
+          borderColor: color,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          tension: 0.35,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: ctx => fmtTs(ctx[0].raw.x),
+              label:  ctx => ` ${ctx.parsed.y.toFixed(2)} ${unit}`,
             }
           }
-        }
-      });
-    } else {
-      // 单轴图表
-      const { key, color, unit, min, max } = cfg;
-      charts[id] = new Chart($(id), {
-        type: 'line',
-        data: {
-          datasets: [{
-            data: chartDataBuffer[id] || [],
-            borderColor: color,
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            pointRadius: 2,
-            pointHoverRadius: 4,
-            tension: 0.35,
-          }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 250 },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                title: ctx => fmtTs(ctx[0].raw.x),
-                label:  ctx => ` ${ctx.parsed.y.toFixed(2)} ${unit}`,
-              }
-            }
+        scales: {
+          x: {
+            type: 'time',
+            time: { tooltipFormat: 'yyyy-MM-dd HH:mm:ss', displayFormats: { minute: 'HH:mm', hour: 'MM-dd HH:mm', day: 'yyyy-MM-dd' } },
+            ticks: { color: '#8b95b0', maxRotation: 0, font: { size: 11 } },
+            grid: { display: false }
           },
-          scales: {
-            x: {
-              type: 'time',
-              time: { tooltipFormat: 'yyyy-MM-dd HH:mm:ss', displayFormats: { minute: 'HH:mm', hour: 'MM-dd HH:mm', day: 'yyyy-MM-dd' } },
-              ticks: { color: '#8b95b0', maxRotation: 0, font: { size: 11 } },
-              grid: { display: false }
-            },
-            y: {
-              min: min,
-              max: max,
-              ticks: { color: '#8b95b0', font: { size: 11 } },
-              grid: { display: false }
-            }
+          y: {
+            min: min,
+            max: max,
+            ticks: { color: '#8b95b0', font: { size: 11 } },
+            grid: { display: false }
           }
         }
-      });
-    }
+      }
+    });
   });
 }
 
 function updateChartsRealtime(data) {
   CHART_CFG.forEach(cfg => {
-    const { id, dual } = cfg;
-    
-    if (dual) {
-      // 双轴图表
-      const { keys } = cfg;
-      keys.forEach((key, idx) => {
-        if (data[key] !== null && data[key] !== undefined) {
-          const newPoint = { x: data.timestamp, y: data[key] };
-          mergeChartData(chartDataBuffer[id][key], newPoint);
-          
-          if (chartsReady && charts[id]) {
-            charts[id].data.datasets[idx].data = chartDataBuffer[id][key];
-          }
-        }
-      });
+    const { id, key } = cfg;
+    if (data[key] !== null && data[key] !== undefined) {
+      const newPoint = { x: data.timestamp, y: data[key] };
+      mergeChartData(chartDataBuffer[id], newPoint);
       
       if (chartsReady && charts[id]) {
+        charts[id].data.datasets[0].data = chartDataBuffer[id];
         charts[id].update('none');
-      }
-    } else {
-      // 单轴图表
-      const { key } = cfg;
-      if (data[key] !== null && data[key] !== undefined) {
-        const newPoint = { x: data.timestamp, y: data[key] };
-        mergeChartData(chartDataBuffer[id], newPoint);
-        
-        if (chartsReady && charts[id]) {
-          charts[id].data.datasets[0].data = chartDataBuffer[id];
-          charts[id].update('none');
-        }
       }
     }
   });
@@ -1114,38 +1091,16 @@ async function loadCharts() {
     const sorted = rows.slice().reverse();
     
     CHART_CFG.forEach(cfg => {
-      const { id, dual } = cfg;
+      const { id, key } = cfg;
+      const data = sorted
+        .filter(r => r[key] !== null && r[key] !== undefined)
+        .map(r => ({ x: r.timestamp, y: r[key] }));
       
-      if (dual) {
-        // 双轴图表
-        const { keys } = cfg;
-        chartDataBuffer[id][keys[0]] = sorted
-          .filter(r => r[keys[0]] !== null && r[keys[0]] !== undefined)
-          .map(r => ({ x: r.timestamp, y: r[keys[0]] }))
-          .slice(-MAX_CHART_POINTS);
-        chartDataBuffer[id][keys[1]] = sorted
-          .filter(r => r[keys[1]] !== null && r[keys[1]] !== undefined)
-          .map(r => ({ x: r.timestamp, y: r[keys[1]] }))
-          .slice(-MAX_CHART_POINTS);
-        
-        if (charts[id]) {
-          charts[id].data.datasets[0].data = chartDataBuffer[id][keys[0]];
-          charts[id].data.datasets[1].data = chartDataBuffer[id][keys[1]];
-          charts[id].update('active');
-        }
-      } else {
-        // 单轴图表
-        const { key } = cfg;
-        const data = sorted
-          .filter(r => r[key] !== null && r[key] !== undefined)
-          .map(r => ({ x: r.timestamp, y: r[key] }));
-        
-        chartDataBuffer[id] = data.slice(-MAX_CHART_POINTS);
-        
-        if (charts[id]) {
-          charts[id].data.datasets[0].data = chartDataBuffer[id];
-          charts[id].update('active');
-        }
+      chartDataBuffer[id] = data.slice(-MAX_CHART_POINTS);
+      
+      if (charts[id]) {
+        charts[id].data.datasets[0].data = chartDataBuffer[id];
+        charts[id].update('active');
       }
     });
   } catch (err) { console.error('Chart load error:', err); }
@@ -1176,22 +1131,10 @@ async function loadInitialChartData() {
     const sorted = rows.slice().reverse();
     
     CHART_CFG.forEach(cfg => {
-      const { id, dual } = cfg;
-      
-      if (dual) {
-        const { keys } = cfg;
-        chartDataBuffer[id][keys[0]] = sorted
-          .filter(r => r[keys[0]] !== null && r[keys[0]] !== undefined)
-          .map(r => ({ x: r.timestamp, y: r[keys[0]] }));
-        chartDataBuffer[id][keys[1]] = sorted
-          .filter(r => r[keys[1]] !== null && r[keys[1]] !== undefined)
-          .map(r => ({ x: r.timestamp, y: r[keys[1]] }));
-      } else {
-        const { key } = cfg;
-        chartDataBuffer[id] = sorted
-          .filter(r => r[key] !== null && r[key] !== undefined)
-          .map(r => ({ x: r.timestamp, y: r[key] }));
-      }
+      const { id, key } = cfg;
+      chartDataBuffer[id] = sorted
+        .filter(r => r[key] !== null && r[key] !== undefined)
+        .map(r => ({ x: r.timestamp, y: r[key] }));
     });
   } catch (err) {
     console.warn('Initial chart data load failed:', err);
@@ -1204,7 +1147,7 @@ let allLogs = [];
 async function loadLogs() {
   try {
     const rows = await (await fetch('/api/logs?limit=500')).json();
-    allLogs    = rows.slice().reverse(); // oldest first
+    allLogs    = rows; // 保持最新的在前
     renderAllLogs();
   } catch (e) { console.error(e); }
 }
@@ -1214,20 +1157,35 @@ function renderAllLogs() {
   const body   = $('logBody');
   body.innerHTML = '';
   const visible = filter ? allLogs.filter(l => l.level === filter) : allLogs;
-  visible.forEach(l => appendRowToBody(l, body));
+  visible.forEach(l => {
+    const lvl = (l.level || 'INFO').toUpperCase();
+    const row = document.createElement('div');
+    row.className = `log-row level-${lvl}`;
+    row.innerHTML = `
+      <span class="l-time">${fmtTs(l.timestamp)}</span>
+      <span class="l-level ${lvl}">${lvl}</span>
+      <span class="l-msg">${escHtml(l.message)}</span>`;
+    body.appendChild(row);
+  });
   $('logCount').textContent = visible.length + ' 条';
   scrollLogs();
 }
 
 function pushLogLine(d) {
-  allLogs.push(d);
-  if (allLogs.length > 2000) allLogs.shift();
+  allLogs.unshift(d); // 添加到开头，保持最新的在前
+  if (allLogs.length > 2000) allLogs.pop(); // 从末尾删除
   const filter = $('selLevel').value;
   if (filter && d.level !== filter) return;
   const body = $('logBody');
-  appendRowToBody(d, body);
+  const lvl = (d.level || 'INFO').toUpperCase();
+  const row = document.createElement('div');
+  row.className = `log-row level-${lvl}`;
+  row.innerHTML = `
+    <span class="l-time">${fmtTs(d.timestamp)}</span>
+    <span class="l-level ${lvl}">${lvl}</span>
+    <span class="l-msg">${escHtml(d.message)}</span>`;
+  body.insertBefore(row, body.firstChild); // 插入到顶部
   $('logCount').textContent = body.children.length + ' 条';
-  scrollLogs();
 }
 
 function appendRowToBody(d, body) {
@@ -1244,7 +1202,7 @@ function appendRowToBody(d, body) {
 function scrollLogs() {
   if ($('chkAutoScroll').checked) {
     const body = $('logBody');
-    body.scrollTop = body.scrollHeight;
+    body.scrollTop = 0; // 滚动到顶部，因为最新的在顶部
   }
 }
 
