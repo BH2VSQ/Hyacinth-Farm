@@ -8,7 +8,7 @@
 
 ```bash
 npm install
-node server.js
+pm2 start server --name "hyacinth-farm"
 ```
 
 服务器启动后会自动生成一个32位的 Session Key 并显示在控制台中。
