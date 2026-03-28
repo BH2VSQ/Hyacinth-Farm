@@ -349,7 +349,7 @@ nav {
 .btn.primary:hover { background: var(--accent2); border-color: var(--accent2); color: #0a0d12; }
 input[type="datetime-local"], select {
   background: var(--surface2); border: 1px solid var(--border);
-  color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px;
+  color: var(--text); padding: 6px 6px; border-radius: 6px; font-size: 13px;
 }
 input[type="datetime-local"]:focus, select:focus { outline: none; border-color: var(--accent); }
 label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
@@ -601,16 +601,16 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
     <div class="log-toolbar">
       <button class="btn" onclick="loadLogs()">刷新</button>
       <button class="btn" onclick="clearLogView()">清屏</button>
-      <label class="autoscroll-label">
-        <input type="checkbox" id="chkAutoScroll" checked> 自动滚动
-      </label>
-      <select id="selLevel" onchange="applyFilter()" style="margin-left:8px;">
-        <option value="">全部级别</option>
+      <select id="selLevel" onchange="applyFilter()">
+        <option value="">筛选器</option>
         <option value="DEBUG">DEBUG</option>
         <option value="INFO">INFO</option>
         <option value="WARN">WARN</option>
         <option value="ERROR">ERROR</option>
       </select>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="chkAutoScroll" checked> 自动
+      </label>
       <span class="log-count" id="logCount">0 条</span>
     </div>
     <div class="log-body" id="logBody"></div>
