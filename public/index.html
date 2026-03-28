@@ -1015,7 +1015,17 @@ async function loadDashboard() {
     const rows = await r.json();
     if (rows.length) {
       $('logPreview').innerHTML = '';
-      rows.forEach(updateLogPreview);
+      // rows已经是最新的在前（从API返回），直接按顺序添加
+      rows.forEach(d => {
+        const lvl = (d.level || 'INFO').toUpperCase();
+        const row = document.createElement('div');
+        row.className = `log-row level-${lvl}`;
+        row.innerHTML = `
+          <span class="l-time">${fmtTs(d.timestamp)}</span>
+          <span class="l-level ${lvl}">${lvl}</span>
+          <span class="l-msg">${escHtml(d.message)}</span>`;
+        $('logPreview').appendChild(row);
+      });
     }
   } catch (e) { console.warn('Dashboard logs load:', e); }
 }
