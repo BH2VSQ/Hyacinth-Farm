@@ -1294,7 +1294,7 @@ function initCharts() {
         ticks: { 
           color: colors[0], 
           font: { size: 11 },
-          callback: function(value) { return value + units[0]; }
+          callback: function(value) { return value.toFixed(2) + units[0]; }
         },
         grid: { display: true, color: 'rgba(139, 149, 176, 0.1)' },
         title: {
@@ -1310,7 +1310,7 @@ function initCharts() {
         ticks: { 
           color: colors[1], 
           font: { size: 11 },
-          callback: function(value) { return value + units[1]; }
+          callback: function(value) { return value.toFixed(2) + units[1]; }
         },
         grid: { display: false },
         title: {
@@ -1323,7 +1323,11 @@ function initCharts() {
     } else {
       // 单Y轴配置
       yScales.y = {
-        ticks: { color: '#8b95b0', font: { size: 11 } },
+        ticks: { 
+          color: '#8b95b0', 
+          font: { size: 11 },
+          callback: function(value) { return value.toFixed(2); }
+        },
         grid: { display: true, color: 'rgba(139, 149, 176, 0.1)' }
       };
     }
@@ -1368,8 +1372,57 @@ function initCharts() {
         scales: {
           x: {
             type: 'time',
-            time: { tooltipFormat: 'yyyy-MM-dd HH:mm:ss', displayFormats: { minute: 'HH:mm', hour: 'MM-dd HH:mm', day: 'yyyy-MM-dd' } },
-            ticks: { color: '#8b95b0', maxRotation: 0, font: { size: 11 } },
+            time: { 
+              tooltipFormat: 'yyyy-MM-dd HH:mm:ss',
+              displayFormats: { 
+                millisecond: 'HH:mm:ss',
+                second: 'HH:mm:ss', 
+                minute: 'HH:mm:ss', 
+                hour: 'HH:mm', 
+                day: 'MM-dd' 
+              },
+              parser: false
+            },
+            adapters: {
+              date: {
+                locale: {
+                  code: 'zh-CN',
+                  formatLong: {},
+                  localize: {},
+                  match: {},
+                  options: {
+                    weekStartsOn: 1,
+                    firstWeekContainsDate: 4
+                  }
+                }
+              }
+            },
+            ticks: { 
+              color: '#8b95b0', 
+              maxRotation: 0, 
+              font: { size: 11 },
+              callback: function(value, index, ticks) {
+                const date = new Date(value);
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                
+                // 根据时间跨度决定显示格式
+                if (ticks.length > 0) {
+                  const range = ticks[ticks.length - 1].value - ticks[0].value;
+                  if (range < 3600000) { // 小于1小时，显示时:分:秒
+                    return `${hours}:${minutes}:${seconds}`;
+                  } else if (range < 86400000) { // 小于1天，显示时:分
+                    return `${hours}:${minutes}`;
+                  } else { // 大于1天，显示月-日
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${month}-${day}`;
+                  }
+                }
+                return `${hours}:${minutes}:${seconds}`;
+              }
+            },
             grid: { display: false }
           },
           ...yScales
@@ -1659,11 +1712,11 @@ loadInitialChartData();
 connectSSE();
 startHeartbeatMonitor();
 
-// 设置默认时间范围为1天
+// 设置默认时间范围为1小时
 const now = new Date();
-const yesterday = new Date(now - 24 * 3600000);
+const oneHourAgo = new Date(now - 1 * 3600000);
 const fmt = d => new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-$('chartStart').value = fmt(yesterday);
+$('chartStart').value = fmt(oneHourAgo);
 $('chartEnd').value = fmt(now);
 </script>
 </body>
