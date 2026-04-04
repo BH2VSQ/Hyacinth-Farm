@@ -922,39 +922,135 @@ function showTab(btn, name) {
 
 // ── SSE ───────────────────────────────────────────────────────────────
 let sseTimer;
+let eventSource = null;
+let lastDataTime = Date.now();
+let visibilityCheckTimer = null;
 
 function connectSSE() {
-  const es = new EventSource('/api/stream');
-  es.addEventListener('connected', () => {
+  // 关闭旧连接
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  
+  eventSource = new EventSource('/api/stream');
+  
+  eventSource.addEventListener('connected', () => {
     console.log('SSE connected');
+    lastDataTime = Date.now();
   });
-  es.addEventListener('data',  e => { 
+  
+  eventSource.addEventListener('data',  e => { 
     const data = JSON.parse(e.data);
     updateSensors(data); 
     showBadge('badge-data');
     updateChartsRealtime(data);
+    lastDataTime = Date.now();
   });
-  es.addEventListener('image', e => { const d = JSON.parse(e.data); setLatestImage(d.filename, d.timestamp); showBadge('badge-img'); });
-  es.addEventListener('event', e => {
+  
+  eventSource.addEventListener('image', e => { 
+    const d = JSON.parse(e.data); 
+    setLatestImage(d.filename, d.timestamp); 
+    showBadge('badge-img');
+    lastDataTime = Date.now();
+  });
+  
+  eventSource.addEventListener('event', e => {
     const data = JSON.parse(e.data);
     prependEvent(data, 5);
     prependEventFull(data);
+    lastDataTime = Date.now();
   });
-  es.addEventListener('log',   e => { 
+  
+  eventSource.addEventListener('log',   e => { 
     const data = JSON.parse(e.data);
     pushLogLine(data);
     updateLogPreview(data);
+    lastDataTime = Date.now();
   });
-  es.addEventListener('heartbeat', e => { 
+  
+  eventSource.addEventListener('heartbeat', e => { 
     const data = JSON.parse(e.data);
-    recordHeartbeat(data); 
+    recordHeartbeat(data);
+    lastDataTime = Date.now();
   });
-  es.onerror = () => {
+  
+  eventSource.onerror = () => {
     console.log('SSE disconnected');
-    es.close();
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
     clearTimeout(sseTimer);
     sseTimer = setTimeout(connectSSE, 5000);
   };
+}
+
+// 页面可见性变化处理
+function handleVisibilityChange() {
+  if (document.hidden) {
+    console.log('Page hidden, SSE will continue in background');
+  } else {
+    console.log('Page visible again');
+    const timeSinceLastData = Date.now() - lastDataTime;
+    
+    // 如果超过30秒没有收到数据，重新加载数据并重连SSE
+    if (timeSinceLastData > 30000) {
+      console.log('Data stale, refreshing...');
+      
+      // 重新加载首页数据
+      loadDashboard();
+      loadHeartbeatStatus();
+      
+      // 如果在图表页面，重新加载图表
+      const chartsPage = document.getElementById('page-charts');
+      if (chartsPage && chartsPage.classList.contains('active')) {
+        loadCharts();
+      }
+      
+      // 如果在事件页面，重新加载事件
+      const eventsPage = document.getElementById('page-events');
+      if (eventsPage && eventsPage.classList.contains('active')) {
+        loadEvents();
+      }
+      
+      // 如果在日志页面，重新加载日志
+      const logsPage = document.getElementById('page-logs');
+      if (logsPage && logsPage.classList.contains('active')) {
+        loadLogs();
+      }
+      
+      // 重连SSE
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      clearTimeout(sseTimer);
+      connectSSE();
+    }
+  }
+}
+
+// 定期检查连接状态
+function startConnectionMonitor() {
+  if (visibilityCheckTimer) clearInterval(visibilityCheckTimer);
+  
+  visibilityCheckTimer = setInterval(() => {
+    // 如果页面可见且超过60秒没有收到任何数据，尝试重连
+    if (!document.hidden) {
+      const timeSinceLastData = Date.now() - lastDataTime;
+      if (timeSinceLastData > 60000) {
+        console.log('No data received for 60s, reconnecting...');
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        clearTimeout(sseTimer);
+        connectSSE();
+        lastDataTime = Date.now(); // 重置时间，避免频繁重连
+      }
+    }
+  }, 10000); // 每10秒检查一次
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────
@@ -1743,6 +1839,18 @@ loadHeartbeatStatus();
 loadInitialChartData();
 connectSSE();
 startHeartbeatMonitor();
+startConnectionMonitor();
+
+// 监听页面可见性变化
+document.addEventListener('visibilitychange', handleVisibilityChange);
+
+// 监听页面焦点变化（作为备用）
+window.addEventListener('focus', () => {
+  const timeSinceLastData = Date.now() - lastDataTime;
+  if (timeSinceLastData > 30000) {
+    handleVisibilityChange();
+  }
+});
 
 // 设置默认时间范围为1小时
 const now = new Date();
