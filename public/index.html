@@ -915,6 +915,8 @@ function showTab(btn, name) {
     if (!chartsReady) { 
       initCharts(); 
       chartsReady = true;
+      // 首次打开图表页面时，自动加载最近1小时的数据
+      setPreset(1);
     }
   }
   if (name === 'logs')    loadLogs();
@@ -1315,6 +1317,9 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Charts ────────────────────────────────────────────────────────────
+// 图表数据点上限配置（从服务器同步）
+let MAX_CHART_DATA_POINTS = 50; // 默认值，会从服务器获取实际值
+
 const CHART_CFG = [
   { id: 'cSoil', keys: ['soil_moisture_a', 'soil_moisture_b'], colors: ['#22c55e', '#3b82f6'], labels: ['土壤湿度A', '土壤湿度B'], unit: '%', min: 0, max: 110, dual: true },
   { id: 'cLight', key: 'light', color: '#60a5fa', label: '光照强度', unit: 'lx', min: 0, max: 2000 },
@@ -1332,7 +1337,7 @@ const chartDataBuffer = {
   cVoltage: { solar_voltage: [], battery_voltage: [], supply_voltage: [] },
   cCurrent: { solar_current: [], battery_current: [], supply_current: [] }
 };
-const MAX_CHART_POINTS = 100;
+// 不再限制前端显示的数据点数量，由后端降采样控制
 
 function makeAxis(color, min, max) {
   const axis = {
@@ -1362,7 +1367,12 @@ function initCharts() {
           backgroundColor: 'transparent',
           borderWidth: 2,
           pointRadius: 2,
-          pointHoverRadius: 4,
+          pointHoverRadius: 5,
+          pointBackgroundColor: colors[idx],
+          pointBorderColor: colors[idx],
+          pointHoverBackgroundColor: colors[idx],
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
           tension: 0.35,
           yAxisID: dualAxis ? (idx === 0 ? 'y' : 'y1') : 'y'
         });
@@ -1376,7 +1386,12 @@ function initCharts() {
         backgroundColor: 'transparent',
         borderWidth: 2,
         pointRadius: 2,
-        pointHoverRadius: 4,
+        pointHoverRadius: 5,
+        pointBackgroundColor: color,
+        pointBorderColor: color,
+        pointHoverBackgroundColor: color,
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
         tension: 0.35,
       });
     }
@@ -1651,31 +1666,44 @@ async function loadCharts() {
   
   try {
     // 先获取数据总数
+    console.log('查询数据总数:', countUrl);
     const countResponse = await fetch(countUrl);
     const countData = await countResponse.json();
+    console.log('返回数据:', countData);
     const totalCount = countData.total || 0;
     
-    // 计算降采样率
-    const maxPoints = 1000;
-    let downsample = 1;
-    if (totalCount > maxPoints) {
-      downsample = Math.ceil(totalCount / maxPoints);
+    // 从服务器获取最大数据点配置
+    if (countData.maxPoints) {
+      MAX_CHART_DATA_POINTS = countData.maxPoints;
     }
     
+    // 计算降采样率
+    let downsample = 1;
+    if (totalCount > MAX_CHART_DATA_POINTS) {
+      downsample = Math.ceil(totalCount / MAX_CHART_DATA_POINTS);
+    }
+    
+    console.log(`总数据点: ${totalCount}, 上限: ${MAX_CHART_DATA_POINTS}, 降采样率: ${downsample}`);
+    
     // 第二步：使用降采样参数查询数据
-    let url = `/api/data?limit=${maxPoints}`;
+    let url = `/api/data?limit=${MAX_CHART_DATA_POINTS}`;
     if (s) url += '&start=' + encodeURIComponent(new Date(s).toISOString());
     if (e) url += '&end='   + encodeURIComponent(new Date(e).toISOString());
     if (downsample > 1) url += '&downsample=' + downsample;
     
+    console.log('查询图表数据:', url);
     const response = await fetch(url);
     const result = await response.json();
+    console.log('返回结果:', { total: result.total, downsampled: result.downsampled, downsampleRate: result.downsampleRate, maxPoints: result.maxPoints, dataLength: result.data ? result.data.length : 'N/A' });
+    
     const rows = result.data || result; // 兼容新旧接口格式
     const sorted = rows.slice().reverse();
     
     // 如果进行了降采样，在控制台输出信息
     if (result.downsampled) {
-      console.log(`数据已降采样: 总数据点 ${totalCount}, 降采样率 1/${downsample}, 显示 ${rows.length} 个数据点`);
+      console.log(`✓ 数据已降采样: 总数据点 ${totalCount}, 降采样率 1/${downsample}, 显示 ${rows.length} 个数据点`);
+    } else {
+      console.log(`✓ 未降采样: 总数据点 ${totalCount}, 显示 ${rows.length} 个数据点`);
     }
     
     CHART_CFG.forEach(cfg => {
@@ -1687,8 +1715,7 @@ async function loadCharts() {
         keys.forEach((key, idx) => {
           chartDataBuffer[id][key] = sorted
             .filter(r => r[key] !== null && r[key] !== undefined)
-            .map(r => ({ x: r.timestamp, y: r[key] }))
-            .slice(-MAX_CHART_POINTS);
+            .map(r => ({ x: r.timestamp, y: r[key] }));
           
           if (charts[id]) {
             charts[id].data.datasets[idx].data = chartDataBuffer[id][key];
@@ -1696,7 +1723,7 @@ async function loadCharts() {
         });
         
         if (charts[id]) {
-          charts[id].update('active');
+          charts[id].update('none');
         }
       } else {
         // 单轴图表
@@ -1705,11 +1732,11 @@ async function loadCharts() {
           .filter(r => r[key] !== null && r[key] !== undefined)
           .map(r => ({ x: r.timestamp, y: r[key] }));
         
-        chartDataBuffer[id] = data.slice(-MAX_CHART_POINTS);
+        chartDataBuffer[id] = data;
         
         if (charts[id]) {
           charts[id].data.datasets[0].data = chartDataBuffer[id];
-          charts[id].update('active');
+          charts[id].update('none');
         }
       }
     });
@@ -1728,10 +1755,7 @@ function mergeChartData(existingData, newPoint) {
     existingData.sort((a, b) => new Date(a.x) - new Date(b.x));
   }
   
-  // 限制数据点数量
-  if (existingData.length > MAX_CHART_POINTS) {
-    existingData.splice(0, existingData.length - MAX_CHART_POINTS);
-  }
+  // 实时数据不限制数量，由查询时的降采样控制
 }
 
 async function loadInitialChartData() {

@@ -9,6 +9,10 @@ const crypto   = require('crypto');
 
 const app = express();
 
+// ── Configuration ─────────────────────────────────────────────────────
+// 图表数据点上限配置（用于降采样）
+const MAX_CHART_DATA_POINTS = 50;
+
 // ── Session Key ───────────────────────────────────────────────────────
 const SESSION_KEY_FILE = path.join(__dirname, '.session_key');
 let SESSION_KEY = '';
@@ -355,46 +359,54 @@ app.get('/api/data', (req, res) => {
   const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 200, 1000));
   const downsample = parseInt(req.query.downsample) || 0; // 降采样间隔，0表示不降采样
   const conditions = [];
-  const params     = [];
-  if (req.query.start) { conditions.push('timestamp >= ?'); params.push(req.query.start); }
-  if (req.query.end)   { conditions.push('timestamp <= ?'); params.push(req.query.end);   }
+  const countParams = [];
+  if (req.query.start) { conditions.push('timestamp >= ?'); countParams.push(req.query.start); }
+  if (req.query.end)   { conditions.push('timestamp <= ?'); countParams.push(req.query.end);   }
 
   const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
 
+  console.log(`[API /api/data] limit=${limit}, downsample=${downsample}, start=${req.query.start || 'N/A'}, end=${req.query.end || 'N/A'}`);
+
   try {
     // 先查询总数
-    const countResult = dbAll(`SELECT COUNT(*) as count FROM sensor_data${where}`, params.slice(0, -1));
+    const countResult = dbAll(`SELECT COUNT(*) as count FROM sensor_data${where}`, countParams);
     const totalCount = countResult[0].count;
     
+    console.log(`[API /api/data] Total count: ${totalCount}`);
+    
     let rows;
-    if (downsample > 1 && totalCount > limit) {
-      // 需要降采样：使用ROW_NUMBER进行均匀采样
-      const sql = `
-        WITH numbered AS (
-          SELECT *, ROW_NUMBER() OVER (ORDER BY timestamp ASC) as rn
-          FROM sensor_data${where}
-        )
-        SELECT * FROM numbered 
-        WHERE (rn - 1) % ? = 0
-        ORDER BY timestamp DESC
-        LIMIT ?
-      `;
-      params.push(downsample);
-      params.push(limit);
-      rows = dbAll(sql, params);
+    if (downsample > 1 && totalCount > MAX_CHART_DATA_POINTS) {
+      // 需要降采样：先获取所有数据，然后在内存中进行降采样
+      console.log(`[API /api/data] Downsampling required: total=${totalCount}, rate=${downsample}, max=${MAX_CHART_DATA_POINTS}`);
+      const allRows = dbAll(`SELECT * FROM sensor_data${where} ORDER BY timestamp ASC`, countParams);
+      
+      // 均匀采样
+      rows = [];
+      for (let i = 0; i < allRows.length; i += downsample) {
+        rows.push(allRows[i]);
+      }
+      
+      // 限制返回数量并倒序
+      rows = rows.slice(0, MAX_CHART_DATA_POINTS).reverse();
+      
+      console.log(`[API /api/data] Downsampling complete: returned ${rows.length} rows`);
     } else {
       // 不降采样，直接返回
-      params.push(limit);
+      console.log(`[API /api/data] No downsampling needed`);
+      const params = [...countParams, limit];
       rows = dbAll(`SELECT * FROM sensor_data${where} ORDER BY timestamp DESC LIMIT ?`, params);
+      console.log(`[API /api/data] Returned ${rows.length} rows`);
     }
     
     res.json({
       data: rows,
       total: totalCount,
-      downsampled: downsample > 1 && totalCount > limit,
-      downsampleRate: downsample
+      downsampled: downsample > 1 && totalCount > MAX_CHART_DATA_POINTS,
+      downsampleRate: downsample,
+      maxPoints: MAX_CHART_DATA_POINTS
     });
   } catch (err) {
+    console.error('[API /api/data] Error:', err);
     return sendError(res, 500, err.message);
   }
 });
