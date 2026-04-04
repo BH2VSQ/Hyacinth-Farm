@@ -10,7 +10,7 @@
 
 ```bash
 npm install
-npm start
+node server.js
 ```
 
 ### 方式2：使用 PM2 部署（生产环境推荐）
