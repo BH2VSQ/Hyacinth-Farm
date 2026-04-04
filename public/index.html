@@ -193,7 +193,11 @@ nav {
 }
 .img-meta { margin-top: 8px; font-size: 12px; color: var(--text2); min-height: 16px; }
 
-.sensor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.sensor-grid { 
+  display: grid; 
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 10px; 
+}
 .s-tile {
   background: var(--surface2); border-radius: 8px; padding: 12px 14px;
   border: 1px solid transparent; transition: border-color .2s;
@@ -450,8 +454,29 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
   .hb-label { font-size: 8px; line-height: 1.2; }
   .hb-dot { width: 8px; height: 8px; }
   
-  .sensor-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sensor-grid { 
+    grid-template-columns: 1fr 1fr; 
+    gap: 8px; 
+  }
+  
+  /* 移动端重新排列：电压电流左右对应 */
   .s-tile { padding: 10px 12px; }
+  
+  /* 保持前6个传感器顺序不变 */
+  #tile-soil-a { order: 1; }
+  #tile-soil-b { order: 2; }
+  #tile-light { order: 3; }
+  #tile-temp { order: 4; }
+  #tile-hum { order: 5; }
+  #tile-pres { order: 6; }
+  
+  /* 电压电流对应排列 */
+  #tile-solar-v { order: 7; }   /* 太阳能电压 - 左列 */
+  #tile-solar-c { order: 8; }   /* 太阳能电流 - 右列 */
+  #tile-batt-v { order: 9; }    /* 电池电压 - 左列 */
+  #tile-batt-c { order: 10; }   /* 电池电流 - 右列 */
+  #tile-supply-v { order: 11; } /* 供电电压 - 左列 */
+  #tile-supply-c { order: 12; } /* 供电电流 - 右列 */
   .s-label { font-size: 10px; }
   .s-val { font-size: 22px; }
   .s-unit { font-size: 12px; }
@@ -589,6 +614,7 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
           <div><span class="s-val" id="v-pres">--</span><span class="s-unit">kPa</span></div>
           <div class="s-time" id="t-pres"></div>
         </div>
+        <!-- 电脑端：第3行（电压） -->
         <div class="s-tile" id="tile-solar-v">
           <div class="s-label">太阳能电压</div>
           <div><span class="s-val" id="v-solar-v">--</span><span class="s-unit">V</span></div>
@@ -604,6 +630,7 @@ label.ctrl-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
           <div><span class="s-val" id="v-supply-v">--</span><span class="s-unit">V</span></div>
           <div class="s-time" id="t-supply-v"></div>
         </div>
+        <!-- 电脑端：第4行（电流） -->
         <div class="s-tile" id="tile-solar-c">
           <div class="s-label">太阳能电流</div>
           <div><span class="s-val" id="v-solar-c">--</span><span class="s-unit">mA</span></div>
